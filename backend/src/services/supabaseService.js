@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import logger from '../utils/logger.js';
 
 class SupabaseService {
@@ -31,31 +32,17 @@ class SupabaseService {
       
       logger.info('Worker found:', { userId: workers.user_id, name: workers.name });
       
-      // パスワード検証
-      // 注: 実際のパスワード検証方法に応じて調整が必要
-      // 1. パスワードが平文で保存されている場合（非推奨）
-      if (workers.password === password) {
-        return {
-          id: workers.id,
-          employeeId: workers.user_id,
-          userId: workers.user_id,
-          name: workers.name
-        };
-      }
+      // パスワード検証 - FlutterのSHA256ハッシュ化と同じロジック
+      const hashedPassword = this.hashPassword(password, userId);
       
-      // 2. bcryptでハッシュ化されている場合
-      if (workers.password && bcrypt.compareSync(password, workers.password)) {
-        return {
-          id: workers.id,
-          employeeId: workers.user_id,
-          userId: workers.user_id,
-          name: workers.name
-        };
-      }
+      logger.info('Password verification:', {
+        userId,
+        inputPasswordHash: hashedPassword,
+        storedPasswordHash: workers.password_hash ? workers.password_hash.substring(0, 10) + '...' : 'no password_hash field'
+      });
       
-      // 3. カスタムハッシュ化の場合（Flutterプロジェクトと同じロジック）
-      const hashedPassword = this.hashPassword(password, workers.salt || userId);
-      if (workers.password === hashedPassword) {
+      // password_hashフィールドと比較
+      if (workers.password_hash === hashedPassword) {
         return {
           id: workers.id,
           employeeId: workers.user_id,
@@ -74,11 +61,11 @@ class SupabaseService {
   }
 
   // パスワードハッシュ化（Flutterプロジェクトと同じロジック）
-  hashPassword(password, salt) {
-    // 注: 実際の実装では、Flutterと同じハッシュアルゴリズムを使用する必要があります
-    // ここでは簡易的にbcryptを使用
-    const saltRounds = 10;
-    return bcrypt.hashSync(password + salt, saltRounds);
+  hashPassword(password, userId) {
+    const salt = userId.toLowerCase();
+    const hash = crypto.createHash('sha256');
+    hash.update(salt + password);
+    return hash.digest('hex');
   }
 
   async signOut() {
