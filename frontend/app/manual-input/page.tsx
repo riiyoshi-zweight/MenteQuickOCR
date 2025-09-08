@@ -2,36 +2,66 @@
 
 import { ArrowLeft, LogOut, User, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function ManualInputPage() {
   const router = useRouter()
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [clients, setClients] = useState<any[]>([])
+  const [wasteTypes, setWasteTypes] = useState<any[]>([])
   const [formData, setFormData] = useState({
-    date: "2025-08-02",
+    date: new Date().toISOString().split('T')[0], // 現在の日付をデフォルトに
     customerName: "",
     netWeight: "",
     item: "",
     manifestNumber: "",
   })
 
-  const customerOptions = [
-    "アース富山株式会社",
-    "アース長野株式会社",
-    "Jマテバイオ株式会社",
-    "環境開発株式会社",
-    "その他",
-  ]
+  // Supabaseから得意先と品目を取得
+  useEffect(() => {
+    fetchClients()
+    fetchWasteTypes()
+  }, [])
 
-  const itemOptions = [
-    "廃プラスチック類",
-    "金属くず",
-    "ガラスくず・コンクリートくず・陶磁器くず",
-    "木くず",
-    "紙くず",
-    "繊維くず",
-    "その他",
-  ]
+  const fetchClients = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients-for-selfinput`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setClients(data.data)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch clients:", error)
+    }
+  }
+
+  const fetchWasteTypes = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/waste-types`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setWasteTypes(data.data)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch waste types:", error)
+    }
+  }
 
   const handleBack = () => {
     router.push("/industrial-waste")
@@ -45,9 +75,43 @@ export default function ManualInputPage() {
     setShowConfirmation(true)
   }
 
-  const handleConfirmSave = () => {
-    setShowConfirmation(false)
-    router.push("/dashboard")
+  const handleConfirmSave = async () => {
+    try {
+      console.log('登録処理開始:', formData)
+      
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips`, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          slipDate: formData.date,
+          clientName: formData.customerName,
+          netWeight: formData.netWeight,
+          productName: formData.item,
+          itemName: formData.item,
+          manifestNumber: formData.manifestNumber || null,
+          slipType: '自社入力',
+          isManualInput: true
+        })
+      })
+      
+      const data = await response.json()
+      console.log('登録レスポンス:', data)
+      
+      if (response.ok && data.success) {
+        setShowConfirmation(false)
+        alert('登録が完了しました')
+        router.push("/dashboard")
+      } else {
+        alert(data.error || '登録に失敗しました')
+      }
+    } catch (error) {
+      console.error('登録エラー:', error)
+      alert('登録中にエラーが発生しました')
+    }
   }
 
   const handleCancelSave = () => {
@@ -110,9 +174,9 @@ export default function ManualInputPage() {
                 className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg appearance-none pr-12"
               >
                 <option value="">選択してください</option>
-                {customerOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                {clients.map((client) => (
+                  <option key={client.id} value={client.name}>
+                    {client.name}
                   </option>
                 ))}
               </select>
@@ -144,9 +208,9 @@ export default function ManualInputPage() {
                 className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg appearance-none pr-12"
               >
                 <option value="">選択してください</option>
-                {itemOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                {wasteTypes.map((wasteType) => (
+                  <option key={wasteType.id} value={wasteType.name}>
+                    {wasteType.name}
                   </option>
                 ))}
               </select>

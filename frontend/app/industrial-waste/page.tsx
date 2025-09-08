@@ -19,8 +19,11 @@ export default function IndustrialWastePage() {
     router.push("/")
   }
 
-  const handleCompanySelect = (companyId: string, companyName: string) => {
-    setSelectedCompany(companyName)
+  const handleCompanySelect = (company: typeof companies[0]) => {
+    setSelectedCompany(company.name)
+    // 選択した会社と伝票タイプをlocalStorageに保存
+    localStorage.setItem('selectedCompany', company.name)
+    localStorage.setItem('selectedSlipType', company.slipType)
     setShowCamera(true)
   }
 
@@ -43,25 +46,29 @@ export default function IndustrialWastePage() {
     {
       id: "earth-toyama",
       name: "アース富山",
-      subtitle: "計量表",
+      subtitle: "計量票",
+      slipType: "計量票",
       icon: "/images/earth-toyama-icon.png",
     },
     {
       id: "earth-nagano",
       name: "アース長野",
       subtitle: "計量伝票",
+      slipType: "計量伝票",
       icon: "/images/earth-nagano-icon.png",
     },
     {
       id: "jmate-bio",
       name: "Jマテバイオ",
       subtitle: "検量書",
+      slipType: "検量書",
       icon: "/images/jmate-bio-icon.png",
     },
     {
       id: "environmental-dev",
       name: "環境開発",
       subtitle: "受領証",
+      slipType: "受領証",
       icon: "/images/environmental-dev-icon.png",
     },
   ]
@@ -102,7 +109,7 @@ export default function IndustrialWastePage() {
               </div>
 
               <button
-                onClick={() => handleCompanySelect(company.id, company.name)}
+                onClick={() => handleCompanySelect(company)}
                 className="border-2 border-[#38b6ff] text-[#38b6ff] bg-white px-6 py-2 rounded-full font-medium hover:bg-[#38b6ff]/5 transition-colors"
               >
                 選択
