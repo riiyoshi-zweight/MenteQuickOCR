@@ -1,5 +1,5 @@
 [build]
-  command = "cd frontend && npm install --force && npm run build && cd ../netlify/functions && npm install"
+  command = "npm install && cd frontend && npm install && npm run build"
   publish = "frontend/.next"
   functions = "netlify/functions"
 
@@ -9,6 +9,9 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
 
 [[redirects]]
   from = "/api/*"
