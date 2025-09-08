@@ -89,8 +89,8 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
   })
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <header className="bg-[#38b6ff] text-white p-4 flex items-center justify-between">
+    <div className="fixed inset-0 bg-white flex flex-col">
+      <header className="bg-[#38b6ff] text-white p-4 flex items-center justify-between flex-shrink-0">
         <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -98,10 +98,10 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
         <div className="w-10" />
       </header>
 
-      <div className="flex-1 relative">
+      <div className="flex-1 relative overflow-hidden">
         {!capturedImage ? (
           <>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
             <canvas ref={canvasRef} className="hidden" />
 
             {isLoading && (
@@ -110,7 +110,7 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
               </div>
             )}
 
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+            <div className="absolute bottom-0 left-0 right-0 pb-8 flex justify-center">
               <button
                 onClick={capturePhoto}
                 disabled={!stream || isLoading}
@@ -122,9 +122,9 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
           </>
         ) : (
           <>
-            <img src={capturedImage || "/placeholder.svg"} alt="Captured" className="w-full h-full object-cover" />
+            <img src={capturedImage || "/placeholder.svg"} alt="Captured" className="absolute inset-0 w-full h-full object-cover" />
 
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4">
+            <div className="absolute bottom-0 left-0 right-0 pb-8 flex justify-center gap-4">
               <button
                 onClick={retakePhoto}
                 className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-gray-400 hover:bg-gray-50 transition-colors"
