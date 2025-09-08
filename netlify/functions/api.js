@@ -28,30 +28,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { userId, password } = req.body;
     
-    // デモユーザーのログイン
-    if (userId === 'test' && password === 'test123') {
-      const token = generateToken({
-        id: 'test-worker-id',
-        userId: 'test',
-        name: 'テストユーザー',
-        employeeId: '001'
-      });
-      
-      return res.json({
-        success: true,
-        data: {
-          token,
-          user: {
-            id: 'test-worker-id',
-            userId: 'test',
-            name: 'テストユーザー',
-            employeeId: '001'
-          }
-        }
-      });
-    }
-    
-    // 実際のSupabase認証
+    // 実際のSupabase認証のみ使用
     const worker = await supabaseService.signIn(userId, password);
     
     if (!worker) {

@@ -17,16 +17,6 @@ class SupabaseService {
   // 認証関連
   async signIn(userId, password) {
     try {
-      // テストユーザーの場合
-      if (userId === 'test' && password === 'test123') {
-        return {
-          id: 'test-worker-id',
-          employeeId: '001',
-          userId: 'test',
-          name: 'テストユーザー'
-        };
-      }
-      
       // workersテーブルから直接ユーザー情報を取得
       const { data: workers, error } = await this.client
         .from('workers')
