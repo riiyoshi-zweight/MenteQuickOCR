@@ -1,25 +1,21 @@
 [build]
-  command = "npm install --force && cd frontend && npm install --force && npm run build"
-  publish = "frontend/.next"
+  command = "npm install && cd frontend && npm install && npm run build"
+  publish = "frontend/out"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NEXT_PUBLIC_API_URL = "/api"
-  NETLIFY_NEXT_PLUGIN_SKIP = "false"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-  included_files = ["backend/**"]
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["backend/**"]
   
 [[headers]]
   for = "/*"
