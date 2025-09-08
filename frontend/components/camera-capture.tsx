@@ -95,12 +95,7 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="text-xl font-semibold">{companyName} - カメラ</h1>
-        <button
-          onClick={goToPreview}
-          className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
-        >
-          デバッグ用
-        </button>
+        <div className="w-10" />
       </header>
 
       <div className="flex-1 relative">
