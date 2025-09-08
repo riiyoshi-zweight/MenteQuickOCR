@@ -1,6 +1,10 @@
 import serverless from 'serverless-http';
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
+// 環境変数を読み込む
+dotenv.config();
 
 // バックエンドのサービスをインポート
 import { ocrService } from '../../backend/src/services/ocrService.js';
