@@ -1,9 +1,4 @@
 import winston from 'winston';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ログレベルの定義
 const levels = {
@@ -36,28 +31,11 @@ const format = winston.format.combine(
 
 // トランスポート定義
 const transports = [
-  // コンソール出力
+  // コンソール出力のみ（Netlify Functionsではファイル書き込みができない）
   new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
       winston.format.simple()
-    ),
-  }),
-  // エラーログファイル
-  new winston.transports.File({
-    filename: path.join(__dirname, '../../logs/error.log'),
-    level: 'error',
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.json()
-    ),
-  }),
-  // 全体ログファイル
-  new winston.transports.File({
-    filename: path.join(__dirname, '../../logs/all.log'),
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.json()
     ),
   }),
 ];
