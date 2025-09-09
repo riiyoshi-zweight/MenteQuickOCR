@@ -93,7 +93,7 @@ router.post('/process-base64', authenticateToken, async (req, res) => {
       });
     }
     
-    console.log(`OCR処理開始: ${slipType}`);
+    console.log(`OCR処理開始: ${slipType} (部分的成功許可版)`);
     
     // 画像前処理
     const processedImage = usePreprocessing ? await preprocessImage(image) : image;
