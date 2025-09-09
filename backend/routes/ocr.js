@@ -210,7 +210,7 @@ function getPromptForSlipType(slipType) {
 - 「空車」列（中央の列）の値は絶対に読まない
 - 必ず「正味」列（右端の列）から読む
 - 得意先は必ず「ブルボン」を含む
-- マニフェスト番号（manifestNumber）は記載されていないのでnull
+- 電子マニフェスト番号（manifestNumber）は常に空白（null）
 
 必ず以下のJSONフォーマットで返してください：
 {
@@ -259,7 +259,7 @@ function getPromptForSlipType(slipType) {
 - 手書き文字は特に注意深く読み取ってください
 - フッターの「上越マテリアル株式会社」は得意先ではありません
 - 赤枠で強調されている値を優先的に読み取ってください
-- マニフェスト番号（manifestNumber）は通常記載されていないのでnull
+- 電子マニフェスト番号（manifestNumber）は常に空白（null）
 
 必ず以下のJSONフォーマットで返してください：
 {
@@ -299,9 +299,8 @@ function getPromptForSlipType(slipType) {
    - 補正Cの行にある場合もあります
    - 数値のみ抽出（kg単位は除去）
 
-5. マニフェスト番号（manifestNumber）
-   - マニフェスト番号の記載があれば読み取ってください
-   - なければnull
+5. 電子マニフェスト番号（manifestNumber）
+   - 常に空白（null）
 
 注意：
 - 画面は青い背景で、黒い文字で印字されています
@@ -313,7 +312,7 @@ function getPromptForSlipType(slipType) {
   "clientName": "得意先名（コード番号は除く）",
   "productName": "品目名（コード番号は除く）",
   "netWeight": "正味重量（数値のみ）",
-  "manifestNumber": "番号またはnull"
+  "manifestNumber": null
 }`,
     
     '計量票': `この画像は計量票です。以下の情報を正確に抽出してください：
@@ -342,9 +341,8 @@ function getPromptForSlipType(slipType) {
    - kg単位の数値を読み取ってください
    - 数値のみ抽出（kg単位は除去）
 
-5. マニフェスト番号（manifestNumber）
-   - 番号欄やマニフェスト番号の記載があれば読み取ってください
-   - なければnull
+5. 電子マニフェスト番号（manifestNumber）
+   - 常に空白（null）
 
 重要：
 - 「現場：」の後の内容が得意先名です
@@ -357,7 +355,7 @@ function getPromptForSlipType(slipType) {
   "clientName": "現場名/得意先名",
   "productName": "品目名",
   "netWeight": "正味重量（数値のみ）",
-  "manifestNumber": "番号またはnull"
+  "manifestNumber": null
 }`
   };
   
@@ -379,7 +377,7 @@ function parseOCRResponse(content, slipType) {
         clientName: result.clientName || result.得意先名 || result.現場名,
         productName: result.productName || result.itemName || result.品名 || result.品目名 || result.銘柄,
         netWeight: result.netWeight || result.正味重量,
-        manifestNumber: result.manifestNumber || result.マニフェスト番号 || null,
+        manifestNumber: null, // 電子マニフェストは常に空白
         slipType: slipType
       };
     } else {
@@ -389,7 +387,7 @@ function parseOCRResponse(content, slipType) {
         clientName: extractValue(content, '得意先') || extractValue(content, '現場') || extractValue(content, 'clientName'),
         productName: extractValue(content, '品名') || extractValue(content, '品目') || extractValue(content, '銘柄') || extractValue(content, 'productName'),
         netWeight: extractValue(content, '正味') || extractValue(content, 'netWeight'),
-        manifestNumber: extractValue(content, 'マニフェスト') || extractValue(content, 'manifestNumber'),
+        manifestNumber: null, // 電子マニフェストは常に空白
         slipType: slipType
       };
     }
@@ -408,10 +406,8 @@ function parseOCRResponse(content, slipType) {
       result.slipDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD形式
     }
     
-    // manifestNumberが空文字の場合はnullに
-    if (!result.manifestNumber || result.manifestNumber === '') {
-      result.manifestNumber = null;
-    }
+    // 電子マニフェストは常に空白
+    result.manifestNumber = null;
     
     return result;
   } catch (error) {

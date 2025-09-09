@@ -76,7 +76,7 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
         clientName: ocrData.clientName || '',
         netWeight: ocrData.netWeight || '',
         productName: ocrData.productName || '',
-        manifestNumber: ocrData.manifestNumber || ''
+        manifestNumber: '' // 電子マニフェストは常に空白
       }
       localStorage.setItem('ocrResult', JSON.stringify(finalResult))
       
