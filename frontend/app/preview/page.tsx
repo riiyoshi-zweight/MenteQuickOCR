@@ -10,69 +10,48 @@ export default function PreviewPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [wasteTypes, setWasteTypes] = useState<any[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0], // 現在の日付をデフォルトに
+    date: new Date().toISOString().split('T')[0],
     customerName: "",
     netWeight: "",
     item: "",
     manifestNumber: "",
-    slipType: "受領証", // デフォルトは受領証
+    slipType: "受領証",
   })
 
   // Supabaseから得意先と品目を取得
   useEffect(() => {
     fetchClients()
     fetchWasteTypes()
-    processOCR()
+    loadOCRResults()
   }, [])
 
-  // OCR処理
-  const processOCR = async () => {
-    const capturedImage = localStorage.getItem("capturedImage")
-    const selectedSlipType = localStorage.getItem("selectedSlipType") || "受領証"
+  // OCR結果を読み込み
+  const loadOCRResults = () => {
+    const ocrResultStr = localStorage.getItem('ocrResult')
+    const selectedSlipType = localStorage.getItem('selectedSlipType') || '受領証'
     
-    if (capturedImage) {
-      setIsProcessing(true)
+    if (ocrResultStr) {
       try {
-        const token = localStorage.getItem("authToken")
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ocr/process-base64`, {
-          method: 'POST',
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            image: capturedImage,
-            slipType: selectedSlipType,
-            usePreprocessing: true,
-            useHighDetail: false
-          })
-        })
+        const ocrData = JSON.parse(ocrResultStr)
+        console.log('OCR結果を読み込み:', ocrData)
         
-        if (response.ok) {
-          const result = await response.json()
-          if (result.success && result.data) {
-            const ocrData = result.data
-            setFormData((prev) => ({
-              ...prev,
-              date: ocrData.slipDate || prev.date,
-              customerName: ocrData.clientName || '',
-              netWeight: ocrData.netWeight || '',
-              item: ocrData.productName || '',
-              manifestNumber: ocrData.manifestNumber || '',
-              slipType: selectedSlipType
-            }))
-            console.log('OCR処理完了:', ocrData)
-          }
-        }
+        // OCR結果をフォームに反映
+        setFormData((prev) => ({
+          ...prev,
+          date: ocrData.slipDate || prev.date,
+          customerName: ocrData.clientName || '',
+          netWeight: ocrData.netWeight || '',
+          item: ocrData.productName || '',
+          manifestNumber: ocrData.manifestNumber || '',
+          slipType: selectedSlipType
+        }))
+        
+        // 使用済みのデータをクリーンアップ
+        localStorage.removeItem('ocrResult')
+        localStorage.removeItem('capturedImage')
       } catch (error) {
-        console.error('OCR処理エラー:', error)
-      } finally {
-        setIsProcessing(false)
-        // 処理後は画像を削除
-        localStorage.removeItem("capturedImage")
-        localStorage.removeItem("selectedSlipType")
+        console.error('OCR結果の読み込みエラー:', error)
       }
     }
   }
@@ -90,6 +69,9 @@ export default function PreviewPage() {
         const data = await response.json()
         if (data.success) {
           setClients(data.data)
+          
+          // OCR結果と得意先をマッチング
+          matchClientFromOCR(data.data)
         }
       }
     } catch (error) {
@@ -110,10 +92,70 @@ export default function PreviewPage() {
         const data = await response.json()
         if (data.success) {
           setWasteTypes(data.data)
+          
+          // OCR結果と品目をマッチング
+          matchWasteTypeFromOCR(data.data)
         }
       }
     } catch (error) {
       console.error("Failed to fetch waste types:", error)
+    }
+  }
+
+  // OCR結果から得意先を自動選択
+  const matchClientFromOCR = (clientList: any[]) => {
+    if (formData.customerName && clientList.length > 0) {
+      const ocrClientName = formData.customerName
+      
+      // 完全一致を探す
+      let matched = clientList.find((client) => 
+        client.name === ocrClientName
+      )
+      
+      // 部分一致を探す
+      if (!matched) {
+        matched = clientList.find((client) => 
+          client.name.includes(ocrClientName) || ocrClientName.includes(client.name)
+        )
+      }
+      
+      // マッチした場合は選択
+      if (matched) {
+        setFormData((prev) => ({
+          ...prev,
+          customerName: matched.name,
+          slipType: getSlipTypeFromClient(matched.name)
+        }))
+        console.log(`得意先「${matched.name}」に自動マッチング`)
+      }
+    }
+  }
+
+  // OCR結果から品目を自動選択
+  const matchWasteTypeFromOCR = (wasteTypeList: any[]) => {
+    if (formData.item && wasteTypeList.length > 0) {
+      const ocrItem = formData.item
+      
+      // 完全一致を探す
+      let matched = wasteTypeList.find((wasteType) => 
+        wasteType.name === ocrItem
+      )
+      
+      // 部分一致を探す
+      if (!matched) {
+        matched = wasteTypeList.find((wasteType) => 
+          wasteType.name.includes(ocrItem) || ocrItem.includes(wasteType.name)
+        )
+      }
+      
+      // マッチした場合は選択
+      if (matched) {
+        setFormData((prev) => ({
+          ...prev,
+          item: matched.name
+        }))
+        console.log(`品目「${matched.name}」に自動マッチング`)
+      }
     }
   }
 
@@ -151,7 +193,7 @@ export default function PreviewPage() {
           productName: formData.item,
           itemName: formData.item,
           manifestNumber: formData.manifestNumber || null,
-          slipType: formData.slipType, // 得意先に応じた伝票タイプ
+          slipType: formData.slipType,
           isManualInput: false
         })
       })
@@ -190,13 +232,6 @@ export default function PreviewPage() {
       </header>
 
       <div className="p-4 space-y-4">
-        {/* OCR処理中のインジケータ */}
-        {isProcessing && (
-          <div className="bg-blue-100 text-blue-700 p-3 rounded-lg text-center">
-            OCR処理中...
-          </div>
-        )}
-        
         {/* Worker Section */}
         <div className="bg-white rounded-lg p-4 flex items-center gap-3">
           <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
@@ -217,7 +252,13 @@ export default function PreviewPage() {
             type="date"
             value={formData.date}
             onChange={(e) => handleInputChange("date", e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg bg-white"
+            className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
+            style={{
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              appearance: 'none',
+              colorScheme: 'light'
+            }}
           />
         </div>
 
