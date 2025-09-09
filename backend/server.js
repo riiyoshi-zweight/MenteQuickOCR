@@ -26,7 +26,13 @@ app.use('/api/slips', slipRoutes);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    env: {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? 'Set' : 'Not set',
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'Set' : 'Not set',
+      SUPABASE_KEY: process.env.SUPABASE_KEY ? 'Set' : 'Not set',
+      JWT_SECRET: process.env.JWT_SECRET ? 'Set' : 'Not set'
+    }
   });
 });
 
@@ -41,4 +47,9 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log('Environment check:');
+  console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Set' : 'Not set');
+  console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Not set');
+  console.log('- SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'Set' : 'Not set');
+  console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
 });
