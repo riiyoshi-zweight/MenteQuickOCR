@@ -27,20 +27,52 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// 画像前処理
+// 画像前処理 - より緩やかな処理で文字を保護
 async function preprocessImage(base64Image) {
   try {
     const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     
-    const processedBuffer = await sharp(buffer)
-      .resize(2000, 2000, { 
-        fit: 'inside',
-        withoutEnlargement: true 
-      })
-      .sharpen()
-      .normalize()
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    // Get image metadata first
+    const metadata = await sharp(buffer).metadata();
+    console.log(`Original image: ${metadata.width}x${metadata.height}, format: ${metadata.format}`);
+    
+    let processedBuffer;
+    
+    // Only resize if image is very large (to save API tokens and preserve quality)
+    if (metadata.width > 3000 || metadata.height > 3000) {
+      processedBuffer = await sharp(buffer)
+        .resize(3000, null, { 
+          withoutEnlargement: true,
+          fit: 'inside',
+          kernel: sharp.kernel.lanczos3 // Better quality resize
+        })
+        .modulate({
+          brightness: 1.05, // Slightly brighten
+          saturation: 0.8   // Reduce saturation for better text contrast
+        })
+        .normalize() // Normalize contrast
+        .jpeg({ 
+          quality: 95,
+          mozjpeg: true // Use mozjpeg encoder for better compression
+        })
+        .toBuffer();
+    } else {
+      // For smaller images, apply minimal processing
+      processedBuffer = await sharp(buffer)
+        .modulate({
+          brightness: 1.05, // Slightly brighten
+          saturation: 0.8   // Reduce saturation for better text contrast
+        })
+        .normalize() // Normalize contrast
+        .jpeg({ 
+          quality: 95,
+          mozjpeg: true
+        })
+        .toBuffer();
+    }
+    
+    const processedMetadata = await sharp(processedBuffer).metadata();
+    console.log(`Processed image: ${processedMetadata.width}x${processedMetadata.height}`);
     
     return `data:image/jpeg;base64,${processedBuffer.toString('base64')}`;
   } catch (error) {
@@ -69,13 +101,13 @@ router.post('/process-base64', authenticateToken, async (req, res) => {
     // プロンプトの準備
     const prompt = getPromptForSlipType(slipType);
     
-    // OpenAI Vision APIを呼び出し
+    // OpenAI Vision APIを呼び出し (常に最高精度で処理)
     const response = await openai.chat.completions.create({
-      model: useHighDetail ? "gpt-4o" : "gpt-4o-mini",
+      model: "gpt-4o", // 常にgpt-4oを使用
       messages: [
         {
           role: "system",
-          content: "あなたは日本語の伝票を正確に読み取るOCRアシスタントです。"
+          content: "あなたは日本語の産業廃棄物伝票を正確に読み取るOCRアシスタントです。特に正味重量の数値は最重要項目として確実に読み取ってください。手書き文字も含めて注意深く読み取り、読み取れなかった項目はnullまたは空文字として返してください。"
         },
         {
           role: "user",
@@ -85,24 +117,52 @@ router.post('/process-base64', authenticateToken, async (req, res) => {
               type: "image_url", 
               image_url: {
                 url: processedImage,
-                detail: useHighDetail ? "high" : "low"
+                detail: "high" // 常にhighを使用
               }
             }
           ]
         }
       ],
       max_tokens: 1000,
-      temperature: 0.2
+      temperature: 0.1 // より確実な結果のため低めに設定
     });
     
     // レスポンスの解析
     const result = parseOCRResponse(response.choices[0].message.content, slipType);
     
-    console.log('OCR処理完了');
+    console.log('OCR処理完了:', {
+      hasNetWeight: !!result.netWeight,
+      hasClientName: !!result.clientName,
+      hasDate: !!result.slipDate,
+      hasProduct: !!result.productName,
+      rawValues: {
+        netWeight: result.netWeight,
+        clientName: result.clientName,
+        slipDate: result.slipDate,
+        productName: result.productName
+      }
+    });
     
+    // Validate net weight (most critical field)
+    const netWeightValid = result.netWeight && !isNaN(parseFloat(result.netWeight));
+    
+    // Always return success, even with partial data
+    // Frontend will handle missing fields appropriately
     res.json({
       success: true,
-      data: result
+      data: result,
+      readQuality: {
+        netWeight: netWeightValid ? 'good' : 'missing',
+        clientName: result.clientName ? 'good' : 'missing',
+        slipDate: result.slipDate ? 'good' : 'default',
+        productName: result.productName ? 'good' : 'missing'
+      },
+      confidence: {
+        netWeight: netWeightValid ? 100 : 0,
+        clientName: result.clientName ? 80 : 0,
+        slipDate: result.slipDate && result.slipDate !== new Date().toISOString().split('T')[0] ? 80 : 50,
+        productName: result.productName ? 80 : 0
+      }
     });
     
   } catch (error) {
