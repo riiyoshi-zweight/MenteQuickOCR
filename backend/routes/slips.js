@@ -149,7 +149,7 @@ router.get('/clients', authenticateToken, async (req, res) => {
     let query = supabase
       .from('client_master')
       .select('*')
-      .order('client_name');
+      .order('client_name_initial', { ascending: true });
     
     // slip_typeでフィルタリング - シンプルにWHERE句を追加
     if (slipType && slipType !== '自社入力') {
@@ -243,7 +243,7 @@ router.get('/clients-for-selfinput', authenticateToken, async (req, res) => {
     const { data, error } = await supabase
       .from('client_master_for_selfinput')
       .select('*')
-      .order('client_name');
+      .order('client_name_initial', { ascending: true });
     
     if (error) {
       console.error('Get clients for selfinput error:', error);
