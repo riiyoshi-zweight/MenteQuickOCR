@@ -105,18 +105,48 @@ export default function PreviewPage() {
   // OCR結果から得意先を自動選択
   const matchClientFromOCR = (clientList: any[]) => {
     if (formData.customerName && clientList.length > 0) {
-      const ocrClientName = formData.customerName
+      const ocrClientName = formData.customerName.toLowerCase()
+      
+      // 特別なマッチングルール（計量票用）
+      // 「上越マテリアル」と「バイオマス」の両方を含む場合は「バイオマス」を選択
+      if (ocrClientName.includes('上越マテリアル') && ocrClientName.includes('バイオマス')) {
+        const matched = clientList.find((client) => 
+          client.name === 'バイオマス'
+        )
+        if (matched) {
+          setFormData((prev) => ({
+            ...prev,
+            customerName: matched.name,
+            slipType: getSlipTypeFromClient(matched.name)
+          }))
+          console.log(`得意先「${matched.name}」に自動マッチング（特別ルール）`)
+          return
+        }
+      }
       
       // 完全一致を探す
       let matched = clientList.find((client) => 
-        client.name === ocrClientName
+        client.name === formData.customerName
       )
       
-      // 部分一致を探す
+      // キーワードベースの部分一致
       if (!matched) {
-        matched = clientList.find((client) => 
-          client.name.includes(ocrClientName) || ocrClientName.includes(client.name)
-        )
+        // OCR結果に含まれるキーワードでマッチング
+        matched = clientList.find((client) => {
+          const clientNameLower = client.name.toLowerCase()
+          // クライアント名がOCR結果に含まれる、またはその逆
+          return ocrClientName.includes(clientNameLower) || clientNameLower.includes(ocrClientName)
+        })
+      }
+      
+      // より柔軟な部分一致（各単語でマッチング）
+      if (!matched) {
+        matched = clientList.find((client) => {
+          const clientWords = client.name.split(/[\s　]+/)
+          return clientWords.some(word => 
+            word.length > 1 && ocrClientName.includes(word.toLowerCase())
+          )
+        })
       }
       
       // マッチした場合は選択
@@ -134,18 +164,50 @@ export default function PreviewPage() {
   // OCR結果から品目を自動選択
   const matchWasteTypeFromOCR = (wasteTypeList: any[]) => {
     if (formData.item && wasteTypeList.length > 0) {
-      const ocrItem = formData.item
+      const ocrItem = formData.item.toLowerCase()
+      
+      // 特別なマッチングルール
+      // 「有機汚泥」「有機性汚泥」→「汚泥」
+      if (ocrItem.includes('汚泥')) {
+        const matched = wasteTypeList.find((wasteType) => 
+          wasteType.name === '汚泥'
+        )
+        if (matched) {
+          setFormData((prev) => ({
+            ...prev,
+            item: matched.name
+          }))
+          console.log(`品目「${matched.name}」に自動マッチング（汚泥ルール）`)
+          return
+        }
+      }
+      
+      // 「廃プラ」を含む場合→「廃プラスチック」
+      if (ocrItem.includes('廃プラ') || ocrItem.includes('プラスチック')) {
+        const matched = wasteTypeList.find((wasteType) => 
+          wasteType.name === '廃プラスチック'
+        )
+        if (matched) {
+          setFormData((prev) => ({
+            ...prev,
+            item: matched.name
+          }))
+          console.log(`品目「${matched.name}」に自動マッチング（廃プラルール）`)
+          return
+        }
+      }
       
       // 完全一致を探す
       let matched = wasteTypeList.find((wasteType) => 
-        wasteType.name === ocrItem
+        wasteType.name === formData.item
       )
       
-      // 部分一致を探す
+      // 部分一致を探す（マスタの名前がOCR結果に含まれる）
       if (!matched) {
-        matched = wasteTypeList.find((wasteType) => 
-          wasteType.name.includes(ocrItem) || ocrItem.includes(wasteType.name)
-        )
+        matched = wasteTypeList.find((wasteType) => {
+          const wasteTypeLower = wasteType.name.toLowerCase()
+          return ocrItem.includes(wasteTypeLower)
+        })
       }
       
       // マッチした場合は選択
