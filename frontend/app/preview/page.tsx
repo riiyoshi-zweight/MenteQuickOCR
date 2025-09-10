@@ -22,9 +22,16 @@ export default function PreviewPage() {
 
   // Supabaseから得意先と品目を取得
   useEffect(() => {
-    fetchClients()
-    fetchWasteTypes()
-    loadOCRResults()
+    // OCR結果を先に読み込み、そのデータを使って得意先・品目を取得
+    const ocrData = loadOCRResults()
+    if (ocrData) {
+      fetchClients(ocrData)
+      fetchWasteTypes(ocrData)
+    } else {
+      // OCRデータがない場合は通常通り取得
+      fetchClients(null)
+      fetchWasteTypes(null)
+    }
   }, [])
 
   // OCR結果を読み込み
@@ -51,13 +58,22 @@ export default function PreviewPage() {
         // 使用済みのデータをクリーンアップ
         localStorage.removeItem('ocrResult')
         localStorage.removeItem('capturedImage')
+        
+        // OCRデータを返す（マッチングで使用）
+        return {
+          clientName: ocrData.clientName || '',
+          productName: ocrData.productName || '',
+          slipType: selectedSlipType
+        }
       } catch (error) {
         console.error('OCR結果の読み込みエラー:', error)
+        return null
       }
     }
+    return null
   }
 
-  const fetchClients = async () => {
+  const fetchClients = async (ocrData: any) => {
     try {
       const token = localStorage.getItem("authToken")
       const slipType = localStorage.getItem('selectedSlipType') || '受領証'
@@ -75,8 +91,10 @@ export default function PreviewPage() {
           setClients(data.data)
           console.log(`伝票タイプ「${slipType}」用の得意先を${data.data.length}件取得しました`)
           
-          // OCR結果と得意先をマッチング
-          matchClientFromOCR(data.data)
+          // OCR結果と得意先をマッチング（OCRデータを直接渡す）
+          if (ocrData && ocrData.clientName) {
+            matchClientFromOCR(data.data, ocrData.clientName, ocrData.slipType)
+          }
         }
       }
     } catch (error) {
@@ -84,7 +102,7 @@ export default function PreviewPage() {
     }
   }
 
-  const fetchWasteTypes = async () => {
+  const fetchWasteTypes = async (ocrData: any) => {
     try {
       const token = localStorage.getItem("authToken")
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/waste-types`, {
@@ -98,8 +116,10 @@ export default function PreviewPage() {
         if (data.success) {
           setWasteTypes(data.data)
           
-          // OCR結果と品目をマッチング
-          matchWasteTypeFromOCR(data.data)
+          // OCR結果と品目をマッチング（OCRデータを直接渡す）
+          if (ocrData && ocrData.productName) {
+            matchWasteTypeFromOCR(data.data, ocrData.productName, ocrData.slipType)
+          }
         }
       }
     } catch (error) {
@@ -108,13 +128,12 @@ export default function PreviewPage() {
   }
 
   // OCR結果から得意先を自動選択（高度なマッチングアルゴリズム）
-  const matchClientFromOCR = (clientList: any[]) => {
-    if (formData.customerName && clientList.length > 0) {
-      const ocrClientName = formData.customerName.toLowerCase()
-      const slipType = localStorage.getItem('selectedSlipType') || '受領証'
+  const matchClientFromOCR = (clientList: any[], ocrClientName: string, slipType: string) => {
+    if (ocrClientName && clientList.length > 0) {
+      const ocrClientNameLower = ocrClientName.toLowerCase()
       
       console.log('得意先マッチング開始:', {
-        ocrResult: formData.customerName,
+        ocrResult: ocrClientName,
         slipType,
         clientCount: clientList.length
       })
@@ -123,7 +142,7 @@ export default function PreviewPage() {
       // 計量票の特別ルール
       if (slipType === '計量票') {
         // 「上越マテリアル」と「バイオマス」の両方を含む場合は「バイオマス」を選択
-        if (ocrClientName.includes('上越マテリアル') && ocrClientName.includes('バイオマス')) {
+        if (ocrClientNameLower.includes('上越マテリアル') && ocrClientNameLower.includes('バイオマス')) {
           const matched = clientList.find((client) => 
             client.name === 'バイオマス'
           )
@@ -139,7 +158,7 @@ export default function PreviewPage() {
         }
         
         // 「上越市水道局」→「上越市下水道センター」の変換
-        if (ocrClientName.includes('上越市') && (ocrClientName.includes('水道') || ocrClientName.includes('下水道'))) {
+        if (ocrClientNameLower.includes('上越市') && (ocrClientNameLower.includes('水道') || ocrClientNameLower.includes('下水道'))) {
           const matched = clientList.find((client) => 
             client.name === '上越市下水道センター'
           )
@@ -156,7 +175,7 @@ export default function PreviewPage() {
       }
       
       // 検量書の特別ルール（○○便、○○帰り便）
-      if (slipType === '検量書' && (ocrClientName.includes('便') || ocrClientName.includes('帰り'))) {
+      if (slipType === '検量書' && (ocrClientNameLower.includes('便') || ocrClientNameLower.includes('帰り'))) {
         // 「アース帰り便」→「アース長野」などの変換
         const transportPatterns = [
           { pattern: 'アース', match: 'アース長野' },
@@ -165,7 +184,7 @@ export default function PreviewPage() {
         ]
         
         for (const { pattern, match } of transportPatterns) {
-          if (ocrClientName.includes(pattern.toLowerCase())) {
+          if (ocrClientNameLower.includes(pattern.toLowerCase())) {
             const matched = clientList.find((client) => 
               client.name === match
             )
@@ -183,9 +202,9 @@ export default function PreviewPage() {
       }
       
       // 受領証の特別ルール（ブルボン）
-      if (slipType === '受領証' && ocrClientName.includes('ブルボン')) {
+      if (slipType === '受領証' && ocrClientNameLower.includes('ブルボン')) {
         // 「上越工場」か「柏崎工場」を含むか判定
-        if (ocrClientName.includes('上越')) {
+        if (ocrClientNameLower.includes('上越')) {
           const matched = clientList.find((client) => 
             client.name.includes('ブルボン') && client.name.includes('上越')
           )
@@ -198,7 +217,7 @@ export default function PreviewPage() {
             console.log(`得意先「${matched.name}」に自動マッチング（ブルボン上越）`)
             return
           }
-        } else if (ocrClientName.includes('柏崎')) {
+        } else if (ocrClientNameLower.includes('柏崎')) {
           const matched = clientList.find((client) => 
             client.name.includes('ブルボン') && client.name.includes('柏崎')
           )
@@ -216,8 +235,8 @@ export default function PreviewPage() {
       
       // 1. 完全一致を探す
       let matched = clientList.find((client) => 
-        client.name === formData.customerName ||
-        client.name.toLowerCase() === ocrClientName
+        client.name === ocrClientName ||
+        client.name.toLowerCase() === ocrClientNameLower
       )
       
       // 2. 正規化して比較（スペース、記号を除去）
@@ -229,7 +248,7 @@ export default function PreviewPage() {
             .replace(/[・]/g, '') // 中点を除去
         }
         
-        const normalizedOCR = normalizeString(formData.customerName)
+        const normalizedOCR = normalizeString(ocrClientName)
         matched = clientList.find((client) => {
           const normalizedClient = normalizeString(client.name)
           return normalizedClient === normalizedOCR ||
@@ -253,7 +272,7 @@ export default function PreviewPage() {
         
         for (const keyword of allKeywords) {
           const keywordLower = keyword.toLowerCase()
-          if (ocrClientName.includes(keywordLower)) {
+          if (ocrClientNameLower.includes(keywordLower)) {
             matched = clientList.find((client) => 
               client.name.toLowerCase().includes(keywordLower)
             )
@@ -270,7 +289,7 @@ export default function PreviewPage() {
         matched = clientList.find((client) => {
           const clientWords = client.name.split(/[\s　・]+/)
           return clientWords.some(word => 
-            word.length > 2 && ocrClientName.includes(word.toLowerCase())
+            word.length > 2 && ocrClientNameLower.includes(word.toLowerCase())
           )
         })
       }
@@ -294,7 +313,7 @@ export default function PreviewPage() {
         let bestScore = 0
         
         for (const client of clientList) {
-          const score = calculateSimilarity(ocrClientName, client.name.toLowerCase())
+          const score = calculateSimilarity(ocrClientNameLower, client.name.toLowerCase())
           if (score > bestScore && score > 0.6) { // 60%以上の類似度
             bestScore = score
             bestMatch = client
@@ -316,20 +335,19 @@ export default function PreviewPage() {
         }))
         console.log(`得意先「${matched.name}」に自動マッチング`)
       } else {
-        console.log('得意先の自動マッチング失敗:', formData.customerName)
+        console.log('得意先の自動マッチング失敗:', ocrClientName)
         console.log('利用可能な得意先:', clientList.map(c => c.name))
       }
     }
   }
 
   // OCR結果から品目を自動選択（高度なマッチングアルゴリズム）
-  const matchWasteTypeFromOCR = (wasteTypeList: any[]) => {
-    if (formData.item && wasteTypeList.length > 0) {
-      const ocrItem = formData.item.toLowerCase()
-      const slipType = localStorage.getItem('selectedSlipType') || '受領証'
+  const matchWasteTypeFromOCR = (wasteTypeList: any[], ocrProductName: string, slipType: string) => {
+    if (ocrProductName && wasteTypeList.length > 0) {
+      const ocrItem = ocrProductName.toLowerCase()
       
       console.log('品目マッチング開始:', {
-        ocrResult: formData.item,
+        ocrResult: ocrProductName,
         slipType,
         wasteTypeCount: wasteTypeList.length
       })
@@ -458,7 +476,7 @@ export default function PreviewPage() {
         }))
         console.log(`品目「${matched.name}」に自動マッチング`)
       } else {
-        console.log('品目の自動マッチング失敗:', formData.item)
+        console.log('品目の自動マッチング失敗:', ocrProductName)
         console.log('利用可能な品目:', wasteTypeList.slice(0, 10).map(w => w.name))
       }
     }
