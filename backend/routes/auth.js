@@ -94,4 +94,46 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ユーザー情報取得エンドポイント
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
+        success: false, 
+        error: '認証が必要です' 
+      });
+    }
+    
+    // トークンを検証
+    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, decoded) => {
+      if (err) {
+        return res.status(403).json({ 
+          success: false, 
+          error: '無効なトークンです' 
+        });
+      }
+      
+      // デコードされたユーザー情報を返す
+      res.json({
+        success: true,
+        data: {
+          id: decoded.id,
+          userId: decoded.userId,
+          name: decoded.name
+        }
+      });
+    });
+    
+  } catch (error) {
+    console.error('Get user info error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'ユーザー情報の取得に失敗しました'
+    });
+  }
+});
+
 module.exports = router;

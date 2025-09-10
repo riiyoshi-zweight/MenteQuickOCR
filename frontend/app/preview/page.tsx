@@ -11,6 +11,7 @@ export default function PreviewPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [wasteTypes, setWasteTypes] = useState<any[]>([])
+  const [workerName, setWorkerName] = useState<string>("テストユーザー") // 作業者名の状態を追加
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     customerName: "",
@@ -22,6 +23,9 @@ export default function PreviewPage() {
 
   // Supabaseから得意先と品目を取得
   useEffect(() => {
+    // ログインユーザー名を取得
+    fetchUserInfo()
+    
     // OCR結果を先に読み込み、そのデータを使って得意先・品目を取得
     const ocrData = loadOCRResults()
     if (ocrData) {
@@ -71,6 +75,28 @@ export default function PreviewPage() {
       }
     }
     return null
+  }
+
+  // ログインユーザー情報を取得
+  const fetchUserInfo = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/me`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          setWorkerName(data.data.name || data.data.userId || "テストユーザー")
+          console.log('作業者名を設定:', data.data.name || data.data.userId)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch user info:", error)
+    }
   }
 
   const fetchClients = async (ocrData: any) => {
@@ -352,6 +378,21 @@ export default function PreviewPage() {
         wasteTypeCount: wasteTypeList.length
       })
       
+      // 検量書（Jマテバイオ）の特別ルール
+      if (slipType === '検量書' && ocrProductName.toLowerCase().includes('産廃生ゴミ')) {
+        const matched = wasteTypeList.find((wasteType) => 
+          wasteType.name === '残さ'
+        )
+        if (matched) {
+          setFormData((prev) => ({
+            ...prev,
+            item: matched.name
+          }))
+          console.log('品目「残さ」に自動マッチング（検量書の産廃生ゴミ特別ルール）')
+          return
+        }
+      }
+      
       // 品目マッチングルールの定義（優先順位順）
       const matchingRules = [
         // 汚泥関連のルール
@@ -364,8 +405,8 @@ export default function PreviewPage() {
         { patterns: ['木くず', '木屑', '木材'], target: '木くず' },
         // がれき類関連のルール
         { patterns: ['がれき', 'ガレキ', '瓦礫'], target: 'がれき類' },
-        // 残さ関連のルール
-        { patterns: ['残さ', '残渣'], target: '残さ' },
+        // 残さ関連のルール（産廃生ゴミも追加）
+        { patterns: ['残さ', '残渣', '産廃生ゴミ', '産廃生ごみ'], target: '残さ' },
         // ガラス・陶磁器関連のルール
         { patterns: ['ガラス', '陶磁器', 'ガラ陶'], target: 'ガラス・陶磁器くず' },
         // 金属くず関連のルール
@@ -562,7 +603,7 @@ export default function PreviewPage() {
           </div>
           <div>
             <div className="text-sm text-gray-600">作業者</div>
-            <div className="font-medium">テストユーザー</div>
+            <div className="font-medium">{workerName}</div>
           </div>
         </div>
 
