@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Eye, EyeOff } from "lucide-react"
-import { Toaster, toast } from "sonner"
+import { toast } from "sonner"
 
 export function LoginForm() {
   const [username, setUsername] = useState("")

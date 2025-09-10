@@ -3,6 +3,7 @@
 import { ArrowLeft, LogOut, User, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 
 export default function ManualInputPage() {
   const router = useRouter()
@@ -103,14 +104,14 @@ export default function ManualInputPage() {
       
       if (response.ok && data.success) {
         setShowConfirmation(false)
-        alert('登録が完了しました')
+        toast.success('登録が完了しました')
         router.push("/dashboard")
       } else {
-        alert(data.error || '登録に失敗しました')
+        toast.error(data.error || '登録に失敗しました')
       }
     } catch (error) {
       console.error('登録エラー:', error)
-      alert('登録中にエラーが発生しました')
+      toast.error('登録中にエラーが発生しました')
     }
   }
 

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react"
 import { ArrowLeft, Camera } from "lucide-react"
 import PhotoConfirmation from "./photo-confirmation"
+import { toast } from "sonner"
 
 interface CameraCaptureProps {
   onBack: () => void
@@ -34,7 +35,7 @@ export default function CameraCapture({ onBack, companyName }: CameraCaptureProp
       }
     } catch (error) {
       console.error("Error accessing camera:", error)
-      alert("カメラにアクセスできませんでした。")
+      toast.error("カメラにアクセスできませんでした。")
     } finally {
       setIsLoading(false)
     }

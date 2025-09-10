@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ArrowLeft, RotateCcw, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { ocrAPI } from "@/lib/api"
+import { toast } from "sonner"
 
 interface PhotoConfirmationProps {
   imageData: string
@@ -94,11 +95,11 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
       // より詳細なエラーメッセージを表示
       let errorMessage = 'OCR処理に失敗しました。'
       if (error instanceof Error) {
-        errorMessage += '\n' + error.message
+        errorMessage += ' ' + error.message
       }
-      errorMessage += '\n\nもう一度お試しください。'
+      errorMessage += ' もう一度お試しください。'
       
-      alert(errorMessage)
+      toast.error(errorMessage)
       // Don't navigate back, just reset the processing state
       setIsProcessing(false)
     }
