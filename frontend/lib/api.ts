@@ -76,15 +76,25 @@ export const authAPI = {
 // OCR API
 export const ocrAPI = {
   processImage: async (imageData: string, slipType: string) => {
-    return apiRequest('/ocr/process-base64', {
-      method: 'POST',
-      body: JSON.stringify({
-        image: imageData,
-        slipType,
-        usePreprocessing: true,
-        useHighDetail: slipType === '計量伝票' || slipType === '検量書',
-      }),
-    });
+    console.log('OCR API呼び出し開始:', { slipType });
+    
+    try {
+      const response = await apiRequest('/ocr/process-base64', {
+        method: 'POST',
+        body: JSON.stringify({
+          image: imageData,
+          slipType,
+          usePreprocessing: true,
+          useHighDetail: slipType === '計量伝票' || slipType === '検量書',
+        }),
+      });
+      
+      console.log('OCR APIレスポンス:', response);
+      return response;
+    } catch (error) {
+      console.error('OCR APIエラー:', error);
+      throw error;
+    }
   },
   
   checkQuality: async (imageFile: File) => {

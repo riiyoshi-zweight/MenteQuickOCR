@@ -90,7 +90,15 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
       setOcrPreview(null)
       setProgress(0)
       setStatusMessage('')
-      alert('OCR処理に失敗しました。もう一度お試しください。')
+      
+      // より詳細なエラーメッセージを表示
+      let errorMessage = 'OCR処理に失敗しました。'
+      if (error instanceof Error) {
+        errorMessage += '\n' + error.message
+      }
+      errorMessage += '\n\nもう一度お試しください。'
+      
+      alert(errorMessage)
       // Don't navigate back, just reset the processing state
       setIsProcessing(false)
     }
