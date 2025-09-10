@@ -144,13 +144,14 @@ router.get('/clients', authenticateToken, async (req, res) => {
     const { slipType } = req.query;
     console.log('Getting clients for slipType:', slipType);
     
-    // slip_typeが指定されている場合はフィルタリング
+    // 得意先データを取得
     let query = supabase
       .from('client_master')
       .select('*');
     
+    // slip_typeカラムでフィルタリング（slip_typeカラムは存在する）
     if (slipType && slipType !== '自社入力') {
-      // slip_typeカラムでフィルタリング
+      console.log('Filtering by slip_type:', slipType);
       query = query.eq('slip_type', slipType);
     }
     
@@ -158,6 +159,7 @@ router.get('/clients', authenticateToken, async (req, res) => {
     
     if (error) {
       console.error('Get clients error:', error);
+      console.error('Error details:', error.message, error.details);
       return res.status(500).json({
         success: false,
         error: '得意先情報の取得に失敗しました'
@@ -173,6 +175,9 @@ router.get('/clients', authenticateToken, async (req, res) => {
     }));
     
     console.log(`Found ${mappedData.length} clients for slipType: ${slipType}`);
+    if (mappedData.length === 0 && slipType) {
+      console.log('警告: 指定された伝票タイプに対応する得意先が見つかりません。slip_typeカラムの値を確認してください。');
+    }
     
     res.json({
       success: true,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { getSlipTypeFromClient } from "@/utils/slipTypeMapping"
+// import { getSlipTypeFromClient } from "@/utils/slipTypeMapping" // 削除：伝票タイプはlocalStorageから取得
 
 export default function PreviewPage() {
   const router = useRouter()
@@ -106,49 +106,156 @@ export default function PreviewPage() {
     }
   }
 
-  // OCR結果から得意先を自動選択
+  // OCR結果から得意先を自動選択（高度なマッチングアルゴリズム）
   const matchClientFromOCR = (clientList: any[]) => {
     if (formData.customerName && clientList.length > 0) {
       const ocrClientName = formData.customerName.toLowerCase()
+      const slipType = localStorage.getItem('selectedSlipType') || '受領証'
       
-      // 特別なマッチングルール（計量票用）
-      // 「上越マテリアル」と「バイオマス」の両方を含む場合は「バイオマス」を選択
-      if (ocrClientName.includes('上越マテリアル') && ocrClientName.includes('バイオマス')) {
-        const matched = clientList.find((client) => 
-          client.name === 'バイオマス'
-        )
-        if (matched) {
-          setFormData((prev) => ({
-            ...prev,
-            customerName: matched.name,
-            slipType: getSlipTypeFromClient(matched.name)
-          }))
-          console.log(`得意先「${matched.name}」に自動マッチング（特別ルール）`)
-          return
+      console.log('得意先マッチング開始:', {
+        ocrResult: formData.customerName,
+        slipType,
+        clientCount: clientList.length
+      })
+      
+      // 伝票タイプ別の特別ルール
+      // 計量票の特別ルール
+      if (slipType === '計量票') {
+        // 「上越マテリアル」と「バイオマス」の両方を含む場合は「バイオマス」を選択
+        if (ocrClientName.includes('上越マテリアル') && ocrClientName.includes('バイオマス')) {
+          const matched = clientList.find((client) => 
+            client.name === 'バイオマス'
+          )
+          if (matched) {
+            setFormData((prev) => ({
+              ...prev,
+              customerName: matched.name,
+              slipType: slipType // localStorageから取得した値を維持
+            }))
+            console.log(`得意先「${matched.name}」に自動マッチング（計量票特別ルール）`)
+            return
+          }
+        }
+        
+        // 「上越市水道局」→「上越市下水道センター」の変換
+        if (ocrClientName.includes('上越市') && (ocrClientName.includes('水道') || ocrClientName.includes('下水道'))) {
+          const matched = clientList.find((client) => 
+            client.name === '上越市下水道センター'
+          )
+          if (matched) {
+            setFormData((prev) => ({
+              ...prev,
+              customerName: matched.name,
+              slipType: slipType // localStorageから取得した値を維持
+            }))
+            console.log(`得意先「${matched.name}」に自動マッチング（下水道センター変換）`)
+            return
+          }
         }
       }
       
-      // 完全一致を探す
+      // 検量書の特別ルール（○○便、○○帰り便）
+      if (slipType === '検量書' && (ocrClientName.includes('便') || ocrClientName.includes('帰り'))) {
+        // 「アース帰り便」→「アース長野」などの変換
+        const transportPatterns = [
+          { pattern: 'アース', match: 'アース長野' },
+          { pattern: 'JMATE', match: 'Jマテバイオ' },
+          { pattern: 'jmate', match: 'Jマテバイオ' },
+        ]
+        
+        for (const { pattern, match } of transportPatterns) {
+          if (ocrClientName.includes(pattern.toLowerCase())) {
+            const matched = clientList.find((client) => 
+              client.name === match
+            )
+            if (matched) {
+              setFormData((prev) => ({
+                ...prev,
+                customerName: matched.name,
+                slipType: slipType // localStorageから取得した値を維持
+              }))
+              console.log(`得意先「${matched.name}」に自動マッチング（検量書便名変換）`)
+              return
+            }
+          }
+        }
+      }
+      
+      // 受領証の特別ルール（ブルボン）
+      if (slipType === '受領証' && ocrClientName.includes('ブルボン')) {
+        // 「上越工場」か「柏崎工場」を含むか判定
+        if (ocrClientName.includes('上越')) {
+          const matched = clientList.find((client) => 
+            client.name.includes('ブルボン') && client.name.includes('上越')
+          )
+          if (matched) {
+            setFormData((prev) => ({
+              ...prev,
+              customerName: matched.name,
+              slipType: slipType // localStorageから取得した値を維持
+            }))
+            console.log(`得意先「${matched.name}」に自動マッチング（ブルボン上越）`)
+            return
+          }
+        } else if (ocrClientName.includes('柏崎')) {
+          const matched = clientList.find((client) => 
+            client.name.includes('ブルボン') && client.name.includes('柏崎')
+          )
+          if (matched) {
+            setFormData((prev) => ({
+              ...prev,
+              customerName: matched.name,
+              slipType: slipType // localStorageから取得した値を維持
+            }))
+            console.log(`得意先「${matched.name}」に自動マッチング（ブルボン柏崎）`)
+            return
+          }
+        }
+      }
+      
+      // 1. 完全一致を探す
       let matched = clientList.find((client) => 
-        client.name === formData.customerName
+        client.name === formData.customerName ||
+        client.name.toLowerCase() === ocrClientName
       )
       
-      // キーワードベースの部分一致
+      // 2. 正規化して比較（スペース、記号を除去）
       if (!matched) {
-        // OCR結果に含まれるキーワードでマッチング
+        const normalizeString = (str: string) => {
+          return str.toLowerCase()
+            .replace(/[\s　（）()\-－・]/g, '')
+            .replace(/株式会社|㈱|有限会社|有/g, '')
+        }
+        
+        const normalizedOCR = normalizeString(formData.customerName)
         matched = clientList.find((client) => {
-          const clientNameLower = client.name.toLowerCase()
-          // クライアント名がOCR結果に含まれる、またはその逆
-          return ocrClientName.includes(clientNameLower) || clientNameLower.includes(ocrClientName)
+          const normalizedClient = normalizeString(client.name)
+          return normalizedClient === normalizedOCR ||
+                 normalizedClient.includes(normalizedOCR) ||
+                 normalizedOCR.includes(normalizedClient)
         })
       }
       
-      // より柔軟な部分一致（各単語でマッチング）
+      // 3. キーワードベースの部分一致
+      if (!matched) {
+        // 重要なキーワードを抽出してマッチング
+        const keywords = ['ブルボン', 'バイオマス', 'アクアクリーン', '下水道', 'アース', 'JMATE', '環境開発']
+        for (const keyword of keywords) {
+          if (ocrClientName.includes(keyword.toLowerCase())) {
+            matched = clientList.find((client) => 
+              client.name.includes(keyword)
+            )
+            if (matched) break
+          }
+        }
+      }
+      
+      // 4. より柔軟な部分一致（各単語でマッチング）
       if (!matched) {
         matched = clientList.find((client) => {
           const clientWords = client.name.split(/[\s　]+/)
           return clientWords.some(word => 
-            word.length > 1 && ocrClientName.includes(word.toLowerCase())
+            word.length > 2 && ocrClientName.includes(word.toLowerCase())
           )
         })
       }
@@ -158,59 +265,110 @@ export default function PreviewPage() {
         setFormData((prev) => ({
           ...prev,
           customerName: matched.name,
-          slipType: getSlipTypeFromClient(matched.name)
+          slipType: slipType // localStorageから取得した値を維持
         }))
         console.log(`得意先「${matched.name}」に自動マッチング`)
+      } else {
+        console.log('得意先の自動マッチング失敗:', formData.customerName)
       }
     }
   }
 
-  // OCR結果から品目を自動選択
+  // OCR結果から品目を自動選択（高度なマッチングアルゴリズム）
   const matchWasteTypeFromOCR = (wasteTypeList: any[]) => {
     if (formData.item && wasteTypeList.length > 0) {
       const ocrItem = formData.item.toLowerCase()
+      const slipType = localStorage.getItem('selectedSlipType') || '受領証'
       
-      // 特別なマッチングルール
-      // 「有機汚泥」「有機性汚泥」→「汚泥」
-      if (ocrItem.includes('汚泥')) {
-        const matched = wasteTypeList.find((wasteType) => 
-          wasteType.name === '汚泥'
-        )
-        if (matched) {
-          setFormData((prev) => ({
-            ...prev,
-            item: matched.name
-          }))
-          console.log(`品目「${matched.name}」に自動マッチング（汚泥ルール）`)
-          return
-        }
-      }
+      console.log('品目マッチング開始:', {
+        ocrResult: formData.item,
+        slipType,
+        wasteTypeCount: wasteTypeList.length
+      })
       
-      // 「廃プラ」を含む場合→「廃プラスチック」
-      if (ocrItem.includes('廃プラ') || ocrItem.includes('プラスチック')) {
-        const matched = wasteTypeList.find((wasteType) => 
-          wasteType.name === '廃プラスチック'
-        )
-        if (matched) {
-          setFormData((prev) => ({
-            ...prev,
-            item: matched.name
-          }))
-          console.log(`品目「${matched.name}」に自動マッチング（廃プラルール）`)
-          return
+      // 品目マッチングルールの定義（優先順位順）
+      const matchingRules = [
+        // 汚泥関連のルール
+        { patterns: ['有機汚泥', '有機性汚泥', '汚泥'], target: '汚泥' },
+        // 廃プラスチック関連のルール
+        { patterns: ['廃プラスチック', '廃プラ', 'プラスチック'], target: '廃プラスチック' },
+        // 廃油関連のルール
+        { patterns: ['廃油', '油'], target: '廃油' },
+        // 木くず関連のルール
+        { patterns: ['木くず', '木屑', '木材'], target: '木くず' },
+        // がれき類関連のルール
+        { patterns: ['がれき', 'ガレキ', '瓦礫'], target: 'がれき類' },
+        // 残さ関連のルール
+        { patterns: ['残さ', '残渣'], target: '残さ' },
+        // ガラス・陶磁器関連のルール
+        { patterns: ['ガラス', '陶磁器', 'ガラ陶'], target: 'ガラス・陶磁器くず' },
+        // 金属くず関連のルール
+        { patterns: ['金属', '鉄', 'スクラップ'], target: '金属くず' },
+        // 紙くず関連のルール
+        { patterns: ['紙くず', '紙'], target: '紙くず' },
+        // 繊維くず関連のルール
+        { patterns: ['繊維', '布'], target: '繊維くず' },
+        // 動植物性残さ関連のルール
+        { patterns: ['動植物', '食品残渣', '生ごみ'], target: '動植物性残さ' },
+        // ゴムくず関連のルール
+        { patterns: ['ゴム', 'ゴムくず'], target: 'ゴムくず' },
+        // 廃アルカリ関連のルール
+        { patterns: ['アルカリ', '廃アルカリ'], target: '廃アルカリ' },
+        // 廃酸関連のルール
+        { patterns: ['廃酸', '酸'], target: '廃酸' },
+        // 混合廃棄物関連のルール
+        { patterns: ['混合', '混廃'], target: '混合廃棄物' },
+      ]
+      
+      // ルールベースのマッチング
+      for (const rule of matchingRules) {
+        for (const pattern of rule.patterns) {
+          if (ocrItem.includes(pattern.toLowerCase())) {
+            const matched = wasteTypeList.find((wasteType) => 
+              wasteType.name === rule.target
+            )
+            if (matched) {
+              setFormData((prev) => ({
+                ...prev,
+                item: matched.name
+              }))
+              console.log(`品目「${matched.name}」に自動マッチング（${pattern}ルール）`)
+              return
+            }
+          }
         }
       }
       
       // 完全一致を探す
       let matched = wasteTypeList.find((wasteType) => 
-        wasteType.name === formData.item
+        wasteType.name === formData.item ||
+        wasteType.name.toLowerCase() === ocrItem
       )
+      
+      // 正規化して比較（記号、類、くずなどを除去）
+      if (!matched) {
+        const normalizeWasteType = (str: string) => {
+          return str.toLowerCase()
+            .replace(/[\s　・]/g, '')
+            .replace(/類|くず|廃/g, '')
+        }
+        
+        const normalizedOCR = normalizeWasteType(formData.item)
+        matched = wasteTypeList.find((wasteType) => {
+          const normalizedWaste = normalizeWasteType(wasteType.name)
+          return normalizedWaste === normalizedOCR ||
+                 normalizedWaste.includes(normalizedOCR) ||
+                 normalizedOCR.includes(normalizedWaste)
+        })
+      }
       
       // 部分一致を探す（マスタの名前がOCR結果に含まれる）
       if (!matched) {
         matched = wasteTypeList.find((wasteType) => {
           const wasteTypeLower = wasteType.name.toLowerCase()
-          return ocrItem.includes(wasteTypeLower)
+          // 双方向で部分一致を確認
+          return ocrItem.includes(wasteTypeLower) || 
+                 wasteTypeLower.includes(ocrItem)
         })
       }
       
@@ -221,6 +379,8 @@ export default function PreviewPage() {
           item: matched.name
         }))
         console.log(`品目「${matched.name}」に自動マッチング`)
+      } else {
+        console.log('品目の自動マッチング失敗:', formData.item)
       }
     }
   }
@@ -228,11 +388,11 @@ export default function PreviewPage() {
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => {
       const updated = { ...prev, [field]: value }
-      // 得意先が変更されたら、対応する伝票タイプを自動設定
-      if (field === "customerName" && value) {
-        updated.slipType = getSlipTypeFromClient(value)
-        console.log(`得意先「${value}」に対応する伝票タイプ: ${updated.slipType}`)
-      }
+      // 得意先が変更されても、伝票タイプは変更しない（localStorageの値を維持）
+      // if (field === "customerName" && value) {
+      //   updated.slipType = getSlipTypeFromClient(value)
+      //   console.log(`得意先「${value}」に対応する伝票タイプ: ${updated.slipType}`)
+      // }
       return updated
     })
   }
