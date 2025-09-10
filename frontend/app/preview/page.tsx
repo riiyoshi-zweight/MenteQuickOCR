@@ -225,6 +225,7 @@ export default function PreviewPage() {
           return str.toLowerCase()
             .replace(/[\s　（）()\-－・]/g, '')
             .replace(/株式会社|㈱|有限会社|有/g, '')
+            .replace(/[・]/g, '') // 中点を除去
         }
         
         const normalizedOCR = normalizeString(formData.customerName)
@@ -236,16 +237,29 @@ export default function PreviewPage() {
         })
       }
       
-      // 3. キーワードベースの部分一致
+      // 3. 伝票タイプ別の優先キーワードマッチング
       if (!matched) {
-        // 重要なキーワードを抽出してマッチング
-        const keywords = ['ブルボン', 'バイオマス', 'アクアクリーン', '下水道', 'アース', 'JMATE', '環境開発']
-        for (const keyword of keywords) {
-          if (ocrClientName.includes(keyword.toLowerCase())) {
+        const slipTypeKeywords: { [key: string]: string[] } = {
+          '受領証': ['ブルボン', 'ぶるぼん', 'bourbon', '環境開発', 'かんきょうかいはつ', '新潟環境'],
+          '検量書': ['jマテバイオ', 'jまてばいお', 'ジェイマテバイオ', 'JMATE', 'マテバイオ', '上越マテリアル'],
+          '計量票': ['アース富山', 'あーす富山', 'earth富山', 'アースとやま'],
+          '計量伝票': ['アース長野', 'あーす長野', 'earth長野', 'アースながの']
+        }
+        
+        const keywords = slipTypeKeywords[slipType] || []
+        const generalKeywords = ['バイオマス', 'アクアクリーン', '下水道', '工場', 'センター', '製紙', '食品']
+        const allKeywords = [...keywords, ...generalKeywords]
+        
+        for (const keyword of allKeywords) {
+          const keywordLower = keyword.toLowerCase()
+          if (ocrClientName.includes(keywordLower)) {
             matched = clientList.find((client) => 
-              client.name.includes(keyword)
+              client.name.toLowerCase().includes(keywordLower)
             )
-            if (matched) break
+            if (matched) {
+              console.log(`キーワード「${keyword}」でマッチング成功`)
+              break
+            }
           }
         }
       }
@@ -253,11 +267,43 @@ export default function PreviewPage() {
       // 4. より柔軟な部分一致（各単語でマッチング）
       if (!matched) {
         matched = clientList.find((client) => {
-          const clientWords = client.name.split(/[\s　]+/)
+          const clientWords = client.name.split(/[\s　・]+/)
           return clientWords.some(word => 
             word.length > 2 && ocrClientName.includes(word.toLowerCase())
           )
         })
+      }
+      
+      // 5. 編集距離ベースのマッチング（類似度が高いものを選択）
+      if (!matched && clientList.length <= 20) { // リストが小さい場合のみ
+        const calculateSimilarity = (str1: string, str2: string) => {
+          const longer = str1.length > str2.length ? str1 : str2
+          const shorter = str1.length > str2.length ? str2 : str1
+          if (longer.length === 0) return 1.0
+          
+          // 簡易的な類似度計算（共通文字の割合）
+          let matchCount = 0
+          for (let i = 0; i < shorter.length; i++) {
+            if (longer.includes(shorter[i])) matchCount++
+          }
+          return matchCount / longer.length
+        }
+        
+        let bestMatch = null
+        let bestScore = 0
+        
+        for (const client of clientList) {
+          const score = calculateSimilarity(ocrClientName, client.name.toLowerCase())
+          if (score > bestScore && score > 0.6) { // 60%以上の類似度
+            bestScore = score
+            bestMatch = client
+          }
+        }
+        
+        if (bestMatch) {
+          matched = bestMatch
+          console.log(`類似度マッチング: ${bestMatch.name} (スコア: ${bestScore.toFixed(2)})`)
+        }
       }
       
       // マッチした場合は選択
@@ -270,6 +316,7 @@ export default function PreviewPage() {
         console.log(`得意先「${matched.name}」に自動マッチング`)
       } else {
         console.log('得意先の自動マッチング失敗:', formData.customerName)
+        console.log('利用可能な得意先:', clientList.map(c => c.name))
       }
     }
   }
@@ -320,11 +367,22 @@ export default function PreviewPage() {
         { patterns: ['混合', '混廃'], target: '混合廃棄物' },
       ]
       
+      // テキスト正規化関数
+      const normalizeText = (text: string) => {
+        return text
+          .toLowerCase()
+          .replace(/[\s　]+/g, '') // スペースを除去
+          .replace(/[・]/g, '') // 中点を除去
+      }
+      
+      const normalizedOCR = normalizeText(ocrItem)
+      
       // ルールベースのマッチング
       for (const rule of matchingRules) {
         for (const pattern of rule.patterns) {
-          if (ocrItem.includes(pattern.toLowerCase())) {
+          if (normalizedOCR.includes(normalizeText(pattern))) {
             const matched = wasteTypeList.find((wasteType) => 
+              normalizeText(wasteType.name).includes(normalizeText(rule.target)) ||
               wasteType.name === rule.target
             )
             if (matched) {
@@ -339,37 +397,56 @@ export default function PreviewPage() {
         }
       }
       
-      // 完全一致を探す
+      // 完全一致を探す（正規化後）
       let matched = wasteTypeList.find((wasteType) => 
-        wasteType.name === formData.item ||
-        wasteType.name.toLowerCase() === ocrItem
+        normalizeText(wasteType.name) === normalizedOCR
       )
       
-      // 正規化して比較（記号、類、くずなどを除去）
+      // 部分一致
       if (!matched) {
-        const normalizeWasteType = (str: string) => {
-          return str.toLowerCase()
-            .replace(/[\s　・]/g, '')
-            .replace(/類|くず|廃/g, '')
-        }
-        
-        const normalizedOCR = normalizeWasteType(formData.item)
         matched = wasteTypeList.find((wasteType) => {
-          const normalizedWaste = normalizeWasteType(wasteType.name)
-          return normalizedWaste === normalizedOCR ||
-                 normalizedWaste.includes(normalizedOCR) ||
-                 normalizedOCR.includes(normalizedWaste)
+          const normalizedWaste = normalizeText(wasteType.name)
+          return normalizedWaste.includes(normalizedOCR) || normalizedOCR.includes(normalizedWaste)
         })
       }
       
-      // 部分一致を探す（マスタの名前がOCR結果に含まれる）
+      // より柔軟な部分一致（各単語でマッチング）
       if (!matched) {
         matched = wasteTypeList.find((wasteType) => {
-          const wasteTypeLower = wasteType.name.toLowerCase()
-          // 双方向で部分一致を確認
-          return ocrItem.includes(wasteTypeLower) || 
-                 wasteTypeLower.includes(ocrItem)
+          const wasteWords = wasteType.name.split(/[\s　・]+/)
+          return wasteWords.some(word => 
+            word.length > 1 && normalizedOCR.includes(normalizeText(word))
+          )
         })
+      }
+      
+      // 類似度ベースのマッチング
+      if (!matched && wasteTypeList.length <= 30) {
+        let bestMatch = null
+        let bestScore = 0
+        
+        for (const wasteType of wasteTypeList) {
+          const normalizedWaste = normalizeText(wasteType.name)
+          let score = 0
+          
+          // 共通文字数をカウント
+          for (let i = 0; i < Math.min(normalizedOCR.length, normalizedWaste.length); i++) {
+            if (normalizedOCR[i] === normalizedWaste[i]) score++
+          }
+          
+          // スコアを正規化
+          const normalizedScore = score / Math.max(normalizedOCR.length, normalizedWaste.length)
+          
+          if (normalizedScore > bestScore && normalizedScore > 0.5) {
+            bestScore = normalizedScore
+            bestMatch = wasteType
+          }
+        }
+        
+        if (bestMatch) {
+          matched = bestMatch
+          console.log(`類似度マッチング: ${bestMatch.name} (スコア: ${bestScore.toFixed(2)})`)
+        }
       }
       
       // マッチした場合は選択
@@ -381,6 +458,7 @@ export default function PreviewPage() {
         console.log(`品目「${matched.name}」に自動マッチング`)
       } else {
         console.log('品目の自動マッチング失敗:', formData.item)
+        console.log('利用可能な品目:', wasteTypeList.slice(0, 10).map(w => w.name))
       }
     }
   }
