@@ -59,7 +59,10 @@ export default function PreviewPage() {
   const fetchClients = async () => {
     try {
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients`, {
+      const slipType = localStorage.getItem('selectedSlipType') || '受領証'
+      
+      // slip_typeをクエリパラメータとして追加
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -69,6 +72,7 @@ export default function PreviewPage() {
         const data = await response.json()
         if (data.success) {
           setClients(data.data)
+          console.log(`伝票タイプ「${slipType}」用の得意先を${data.data.length}件取得しました`)
           
           // OCR結果と得意先をマッチング
           matchClientFromOCR(data.data)

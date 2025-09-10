@@ -138,14 +138,23 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// 得意先一覧取得エンドポイント
+// 得意先一覧取得エンドポイント（slip_typeでフィルタリング）
 router.get('/clients', authenticateToken, async (req, res) => {
   try {
-    // client_masterテーブルから取得
-    const { data, error } = await supabase
+    const { slipType } = req.query;
+    console.log('Getting clients for slipType:', slipType);
+    
+    // slip_typeが指定されている場合はフィルタリング
+    let query = supabase
       .from('client_master')
-      .select('*')
-      .order('client_name');
+      .select('*');
+    
+    if (slipType && slipType !== '自社入力') {
+      // slip_typeカラムでフィルタリング
+      query = query.eq('slip_type', slipType);
+    }
+    
+    const { data, error } = await query.order('client_name');
     
     if (error) {
       console.error('Get clients error:', error);
@@ -159,8 +168,11 @@ router.get('/clients', authenticateToken, async (req, res) => {
     const mappedData = (data || []).map(client => ({
       id: client.id,
       name: client.client_name,
+      slipType: client.slip_type,
       ...client
     }));
+    
+    console.log(`Found ${mappedData.length} clients for slipType: ${slipType}`);
     
     res.json({
       success: true,
