@@ -142,27 +142,38 @@ router.post('/', authenticateToken, async (req, res) => {
 router.get('/clients', authenticateToken, async (req, res) => {
   try {
     const { slipType } = req.query;
-    console.log('Getting clients for slipType:', slipType);
+    console.log('=== 得意先取得 ===');
+    console.log('リクエストされた slipType:', slipType);
     
-    // 得意先データを取得
+    // 基本クエリ
     let query = supabase
       .from('client_master')
-      .select('*');
+      .select('*')
+      .order('client_name');
     
-    // slip_typeカラムでフィルタリング（slip_typeカラムは存在する）
+    // slip_typeでフィルタリング - シンプルにWHERE句を追加
     if (slipType && slipType !== '自社入力') {
-      console.log('Filtering by slip_type:', slipType);
+      console.log(`WHERE slip_type = '${slipType}' を適用`);
       query = query.eq('slip_type', slipType);
     }
     
-    const { data, error } = await query.order('client_name');
+    // クエリ実行
+    const { data, error } = await query;
     
     if (error) {
-      console.error('Get clients error:', error);
-      console.error('Error details:', error.message, error.details);
+      console.error('Supabase エラー:', error);
       return res.status(500).json({
         success: false,
         error: '得意先情報の取得に失敗しました'
+      });
+    }
+    
+    // デバッグ: 取得したデータを確認
+    console.log(`取得件数: ${data ? data.length : 0}件`);
+    if (data && data.length > 0) {
+      console.log('サンプルデータ:', {
+        client_name: data[0].client_name,
+        slip_type: data[0].slip_type
       });
     }
     
@@ -170,14 +181,8 @@ router.get('/clients', authenticateToken, async (req, res) => {
     const mappedData = (data || []).map(client => ({
       id: client.id,
       name: client.client_name,
-      slipType: client.slip_type,
       ...client
     }));
-    
-    console.log(`Found ${mappedData.length} clients for slipType: ${slipType}`);
-    if (mappedData.length === 0 && slipType) {
-      console.log('警告: 指定された伝票タイプに対応する得意先が見つかりません。slip_typeカラムの値を確認してください。');
-    }
     
     res.json({
       success: true,
@@ -185,7 +190,7 @@ router.get('/clients', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get clients error:', error);
+    console.error('予期しないエラー:', error);
     res.status(500).json({
       success: false,
       error: '得意先情報の取得に失敗しました'
