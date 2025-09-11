@@ -118,7 +118,7 @@ export default function ManualInputPage() {
           productName: formData.item,
           itemName: formData.item,
           manifestNumber: formData.manifestNumber || null,
-          slipType: '自社入力',
+          slipType: '手動入力',
           isManualInput: true
         })
       })
@@ -184,7 +184,7 @@ export default function ManualInputPage() {
               type="date"
               value={formData.date}
               onChange={(e) => handleInputChange("date", e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
             />
           </div>
 
