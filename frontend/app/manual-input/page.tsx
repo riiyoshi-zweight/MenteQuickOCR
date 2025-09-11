@@ -10,6 +10,7 @@ export default function ManualInputPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [wasteTypes, setWasteTypes] = useState<any[]>([])
+  const [workerName, setWorkerName] = useState<string>("テストユーザー") // 作業者名の状態を追加
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0], // 現在の日付をデフォルトに
     customerName: "",
@@ -20,6 +21,7 @@ export default function ManualInputPage() {
 
   // Supabaseから得意先と品目を取得
   useEffect(() => {
+    fetchUserInfo()
     fetchClients()
     fetchWasteTypes()
   }, [])
@@ -61,6 +63,28 @@ export default function ManualInputPage() {
       }
     } catch (error) {
       console.error("Failed to fetch waste types:", error)
+    }
+  }
+
+  // ログインユーザー情報を取得
+  const fetchUserInfo = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/me`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          setWorkerName(data.data.name || data.data.userId || "テストユーザー")
+          console.log('作業者名を設定:', data.data.name || data.data.userId)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch user info:", error)
     }
   }
 
@@ -146,7 +170,7 @@ export default function ManualInputPage() {
             <User className="w-5 h-5 text-gray-600" />
             <div>
               <div className="text-sm text-gray-600">作業者</div>
-              <div className="font-medium">テストユーザー</div>
+              <div className="font-medium">{workerName}</div>
             </div>
           </div>
         </div>
@@ -160,7 +184,7 @@ export default function ManualInputPage() {
               type="date"
               value={formData.date}
               onChange={(e) => handleInputChange("date", e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
             />
           </div>
 
@@ -172,7 +196,7 @@ export default function ManualInputPage() {
               <select
                 value={formData.customerName}
                 onChange={(e) => handleInputChange("customerName", e.target.value)}
-                className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg appearance-none pr-12"
+                className="w-full p-3 border border-gray-300 rounded-lg bg-white appearance-none pr-12"
               >
                 <option value="">選択してください</option>
                 {clients.map((client) => (
@@ -193,7 +217,7 @@ export default function ManualInputPage() {
               type="number"
               value={formData.netWeight}
               onChange={(e) => handleInputChange("netWeight", e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-white"
               placeholder=""
             />
           </div>
@@ -206,7 +230,7 @@ export default function ManualInputPage() {
               <select
                 value={formData.item}
                 onChange={(e) => handleInputChange("item", e.target.value)}
-                className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg appearance-none pr-12"
+                className="w-full p-3 border border-gray-300 rounded-lg bg-white appearance-none pr-12"
               >
                 <option value="">選択してください</option>
                 {wasteTypes.map((wasteType) => (
@@ -225,7 +249,7 @@ export default function ManualInputPage() {
               type="text"
               value={formData.manifestNumber}
               onChange={(e) => handleInputChange("manifestNumber", e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-lg"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-white"
               placeholder=""
             />
           </div>
