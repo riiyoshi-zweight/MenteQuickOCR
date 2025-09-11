@@ -10,7 +10,7 @@ export default function ManualInputPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [wasteTypes, setWasteTypes] = useState<any[]>([])
-  const [workerName, setWorkerName] = useState<string>("テストユーザー") // 作業者名の状態を追加
+  const [workerName, setWorkerName] = useState<string>("") // 作業者名の状態を追加
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0], // 現在の日付をデフォルトに
     customerName: "",
@@ -79,7 +79,7 @@ export default function ManualInputPage() {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data) {
-          setWorkerName(data.data.name || data.data.userId || "テストユーザー")
+          setWorkerName(data.data.name || data.data.userId || "")
           console.log('作業者名を設定:', data.data.name || data.data.userId)
         }
       }
@@ -170,7 +170,7 @@ export default function ManualInputPage() {
             <User className="w-5 h-5 text-gray-600" />
             <div>
               <div className="text-sm text-gray-600">作業者</div>
-              <div className="font-medium">{workerName}</div>
+              <div className="font-medium">{workerName || "読み込み中..."}</div>
             </div>
           </div>
         </div>
@@ -184,7 +184,13 @@ export default function ManualInputPage() {
               type="date"
               value={formData.date}
               onChange={(e) => handleInputChange("date", e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#38b6ff] focus:border-transparent"
+              style={{
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                appearance: 'none',
+                colorScheme: 'light'
+              }}
             />
           </div>
 
