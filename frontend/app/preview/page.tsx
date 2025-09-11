@@ -684,7 +684,20 @@ export default function PreviewPage() {
           </div>
         </div>
 
-        {/* Manifest Number Field - 電子マニフェストは常に空白なので非表示 */}
+        {/* Manifest Number Field */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            電子マニフェスト4桁
+          </label>
+          <input
+            type="text"
+            value={formData.manifestNumber}
+            onChange={(e) => handleInputChange("manifestNumber", e.target.value)}
+            placeholder="4桁の番号を入力"
+            maxLength={4}
+            className="w-full p-3 border border-gray-300 rounded-lg bg-white"
+          />
+        </div>
 
         {/* Save Button */}
         <button
