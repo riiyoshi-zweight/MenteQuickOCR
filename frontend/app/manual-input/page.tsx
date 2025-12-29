@@ -29,7 +29,7 @@ export default function ManualInputPage() {
   const fetchClients = async () => {
     try {
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients-for-selfinput`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
