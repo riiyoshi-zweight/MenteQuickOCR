@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_URL = '/api';
 
 // 認証トークンの管理
 let authToken: string | null = null;
@@ -60,14 +60,6 @@ export const authAPI = {
     return response;
   },
   
-  logout: async () => {
-    const response = await apiRequest('/auth/logout', {
-      method: 'POST',
-    });
-    setAuthToken(null);
-    return response;
-  },
-  
   getMe: async () => {
     return apiRequest('/auth/me');
   },
@@ -97,18 +89,6 @@ export const ocrAPI = {
     }
   },
   
-  checkQuality: async (imageFile: File) => {
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    
-    return fetch(`${API_URL}/ocr/check-quality`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-      },
-      body: formData,
-    }).then(res => res.json());
-  },
 };
 
 // 伝票API
@@ -120,42 +100,7 @@ export const slipsAPI = {
     });
   },
   
-  checkDuplicate: async (date: string, clientName: string, weight: number) => {
-    return apiRequest('/slips/check-duplicate', {
-      method: 'POST',
-      body: JSON.stringify({ date, clientName, weight }),
-    });
-  },
-  
-  getList: async (filters?: any) => {
-    const params = new URLSearchParams(filters).toString();
-    return apiRequest(`/slips${params ? `?${params}` : ''}`);
-  },
-  
-  getStatistics: async (filters?: any) => {
-    const params = new URLSearchParams(filters).toString();
-    return apiRequest(`/slips/statistics${params ? `?${params}` : ''}`);
-  },
 };
-
-// クライアントAPI
-export const clientsAPI = {
-  getClients: async () => {
-    return apiRequest('/clients');
-  },
-  
-  getWorkers: async () => {
-    return apiRequest('/clients/workers');
-  },
-};
-
-// エラーハンドリング
-export class APIError extends Error {
-  constructor(message: string, public code?: string) {
-    super(message);
-    this.name = 'APIError';
-  }
-}
 
 // 初期化（トークンの復元）
 if (typeof window !== 'undefined') {

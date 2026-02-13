@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "app/api/ocr/process-base64/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
+}

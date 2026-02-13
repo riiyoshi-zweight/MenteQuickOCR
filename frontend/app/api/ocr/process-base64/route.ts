@@ -1,182 +1,57 @@
-const express = require('express');
-const router = express.Router();
-const OpenAI = require('openai');
-const sharp = require('sharp');
-const jwt = require('jsonwebtoken');
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import sharp from 'sharp';
+import { authenticateRequest } from '@/lib/server/auth';
 
-// OpenAIクライアントの初期化
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// 認証ミドルウェア
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ success: false, error: '認証が必要です' });
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ success: false, error: '無効なトークンです' });
-    }
-    req.user = user;
-    next();
-  });
+  return _openai;
 }
 
-// 画像前処理 - より緩やかな処理で文字を保護
-async function preprocessImage(base64Image) {
+// 画像前処理
+async function preprocessImage(base64Image: string): Promise<string> {
   try {
     const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    
-    // Get image metadata first
     const metadata = await sharp(buffer).metadata();
     console.log(`Original image: ${metadata.width}x${metadata.height}, format: ${metadata.format}`);
-    
-    let processedBuffer;
-    
-    // Only resize if image is very large (to save API tokens and preserve quality)
-    if (metadata.width > 3000 || metadata.height > 3000) {
+
+    let processedBuffer: Buffer;
+
+    if ((metadata.width || 0) > 3000 || (metadata.height || 0) > 3000) {
       processedBuffer = await sharp(buffer)
-        .resize(3000, null, { 
+        .resize(3000, null, {
           withoutEnlargement: true,
           fit: 'inside',
-          kernel: sharp.kernel.lanczos3 // Better quality resize
+          kernel: sharp.kernel.lanczos3,
         })
-        .modulate({
-          brightness: 1.05, // Slightly brighten
-          saturation: 0.8   // Reduce saturation for better text contrast
-        })
-        .normalize() // Normalize contrast
-        .jpeg({ 
-          quality: 95,
-          mozjpeg: true // Use mozjpeg encoder for better compression
-        })
+        .modulate({ brightness: 1.05, saturation: 0.8 })
+        .normalize()
+        .jpeg({ quality: 95, mozjpeg: true })
         .toBuffer();
     } else {
-      // For smaller images, apply minimal processing
       processedBuffer = await sharp(buffer)
-        .modulate({
-          brightness: 1.05, // Slightly brighten
-          saturation: 0.8   // Reduce saturation for better text contrast
-        })
-        .normalize() // Normalize contrast
-        .jpeg({ 
-          quality: 95,
-          mozjpeg: true
-        })
+        .modulate({ brightness: 1.05, saturation: 0.8 })
+        .normalize()
+        .jpeg({ quality: 95, mozjpeg: true })
         .toBuffer();
     }
-    
+
     const processedMetadata = await sharp(processedBuffer).metadata();
     console.log(`Processed image: ${processedMetadata.width}x${processedMetadata.height}`);
-    
+
     return `data:image/jpeg;base64,${processedBuffer.toString('base64')}`;
   } catch (error) {
     console.error('Image preprocessing error:', error);
-    return base64Image; // 前処理失敗時は元の画像を返す
+    return base64Image;
   }
 }
 
-// OCR処理エンドポイント
-router.post('/process-base64', authenticateToken, async (req, res) => {
-  try {
-    const { image, slipType, usePreprocessing = true, useHighDetail = false } = req.body;
-    
-    if (!image || !slipType) {
-      return res.status(400).json({
-        success: false,
-        error: '画像とタイプが必要です'
-      });
-    }
-    
-    console.log(`OCR処理開始: ${slipType} (部分的成功許可版)`);
-    
-    // 画像前処理
-    const processedImage = usePreprocessing ? await preprocessImage(image) : image;
-    
-    // プロンプトの準備
-    const prompt = getPromptForSlipType(slipType);
-    
-    // OpenAI Vision APIを呼び出し (常に最高精度で処理)
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // 常にgpt-4oを使用
-      messages: [
-        {
-          role: "system",
-          content: "あなたは日本語の産業廃棄物伝票を正確に読み取るOCRアシスタントです。特に正味重量の数値は最重要項目として確実に読み取ってください。手書き文字も含めて注意深く読み取り、読み取れなかった項目はnullまたは空文字として返してください。"
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { 
-              type: "image_url", 
-              image_url: {
-                url: processedImage,
-                detail: "high" // 常にhighを使用
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.1 // より確実な結果のため低めに設定
-    });
-    
-    // レスポンスの解析
-    const result = parseOCRResponse(response.choices[0].message.content, slipType);
-    
-    console.log('OCR処理完了:', {
-      hasNetWeight: !!result.netWeight,
-      hasClientName: !!result.clientName,
-      hasDate: !!result.slipDate,
-      hasProduct: !!result.productName,
-      rawValues: {
-        netWeight: result.netWeight,
-        clientName: result.clientName,
-        slipDate: result.slipDate,
-        productName: result.productName
-      }
-    });
-    
-    // Validate net weight (most critical field)
-    const netWeightValid = result.netWeight && !isNaN(parseFloat(result.netWeight));
-    
-    // Always return success, even with partial data
-    // Frontend will handle missing fields appropriately
-    res.json({
-      success: true,
-      data: result,
-      readQuality: {
-        netWeight: netWeightValid ? 'good' : 'missing',
-        clientName: result.clientName ? 'good' : 'missing',
-        slipDate: result.slipDate ? 'good' : 'default',
-        productName: result.productName ? 'good' : 'missing'
-      },
-      confidence: {
-        netWeight: netWeightValid ? 100 : 0,
-        clientName: result.clientName ? 80 : 0,
-        slipDate: result.slipDate && result.slipDate !== new Date().toISOString().split('T')[0] ? 80 : 50,
-        productName: result.productName ? 80 : 0
-      }
-    });
-    
-  } catch (error) {
-    console.error('OCR error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'OCR処理中にエラーが発生しました'
-    });
-  }
-});
-
 // 伝票タイプ別のプロンプト取得
-function getPromptForSlipType(slipType) {
-  const prompts = {
+function getPromptForSlipType(slipType: string): string {
+  const prompts: Record<string, string> = {
     '受領証': `この画像は環境開発の産業廃棄物受領証です。以下の情報を正確に抽出してください：
 
 レイアウト詳細：
@@ -226,7 +101,7 @@ function getPromptForSlipType(slipType) {
   "netWeight": "正味重量（数値のみ）",
   "manifestNumber": null
 }`,
-    
+
     '検量書': `この画像はJマテバイオの検量書です。以下の情報を正確に抽出してください：
 
 レイアウト詳細：
@@ -271,7 +146,7 @@ function getPromptForSlipType(slipType) {
   "netWeight": "正味重量（数値のみ）",
   "manifestNumber": null
 }`,
-    
+
     '計量伝票': `この画像はアース長野の計量伝票です。青い背景の伝票で、以下の情報を正確に抽出してください：
 
 レイアウト詳細：
@@ -325,7 +200,7 @@ function getPromptForSlipType(slipType) {
   "netWeight": "正味重量（数値のみ）",
   "manifestNumber": null
 }`,
-    
+
     '計量票': `この画像は計量票です。白い背景の伝票で、以下の情報を正確に抽出してください：
 
 1. 日付（slipDate）
@@ -372,43 +247,50 @@ function getPromptForSlipType(slipType) {
   "productName": "品目名",
   "netWeight": "正味重量（数値のみ）",
   "manifestNumber": null
-}`
+}`,
   };
-  
+
   return prompts[slipType] || prompts['受領証'];
 }
 
 // OCRレスポンスの解析
-function parseOCRResponse(content, slipType) {
+function parseOCRResponse(content: string, slipType: string) {
   try {
-    // JSONとして解析を試みる
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    let result;
-    
+    let result: any;
+
     if (jsonMatch) {
       result = JSON.parse(jsonMatch[0]);
-      // フィールド名の正規化
       result = {
-        slipDate: result.slipDate || result.date || result.日付,
-        clientName: result.clientName || result.得意先名 || result.現場名,
-        productName: result.productName || result.itemName || result.品名 || result.品目名 || result.銘柄,
-        netWeight: result.netWeight || result.正味重量,
-        manifestNumber: null, // 電子マニフェストは常に空白
-        slipType: slipType
+        slipDate: result.slipDate || result.date || result['日付'],
+        clientName: result.clientName || result['得意先名'] || result['現場名'],
+        productName: result.productName || result.itemName || result['品名'] || result['品目名'] || result['銘柄'],
+        netWeight: result.netWeight || result['正味重量'],
+        manifestNumber: null,
+        slipType: slipType,
       };
     } else {
-      // テキストから情報を抽出（フォールバック）
       result = {
         slipDate: extractValue(content, '日付') || extractValue(content, 'slipDate'),
         clientName: extractValue(content, '得意先') || extractValue(content, '現場') || extractValue(content, 'clientName'),
         productName: extractValue(content, '品名') || extractValue(content, '品目') || extractValue(content, '銘柄') || extractValue(content, 'productName'),
         netWeight: extractValue(content, '正味') || extractValue(content, 'netWeight'),
-        manifestNumber: null, // 電子マニフェストは常に空白
-        slipType: slipType
+        manifestNumber: null,
+        slipType: slipType,
       };
     }
-    
-    // 数値の正規化（カンマやkg単位を除去）
+
+    // 日付の年をシステム年で補正（OCRの西暦読み取り精度が低いため）
+    if (result.slipDate) {
+      const currentYear = new Date().getFullYear();
+      // YYYY-MM-DD形式の年部分をシステム年に置換
+      const dateMatch = result.slipDate.match(/^\d{4}-(\d{2}-\d{2})$/);
+      if (dateMatch) {
+        result.slipDate = `${currentYear}-${dateMatch[1]}`;
+      }
+    }
+
+    // 数値の正規化
     if (result.netWeight) {
       result.netWeight = String(result.netWeight)
         .replace(/,/g, '')
@@ -416,32 +298,121 @@ function parseOCRResponse(content, slipType) {
         .replace(/\s/g, '')
         .trim();
     }
-    
-    // 日付が取得できなかった場合、現在の日付を設定
+
+    // 日付が取得できなかった場合
     if (!result.slipDate || result.slipDate === '' || result.slipDate === 'null' || result.slipDate === 'undefined') {
-      result.slipDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD形式
+      result.slipDate = new Date().toISOString().split('T')[0];
     }
-    
-    // 電子マニフェストは常に空白
+
     result.manifestNumber = null;
-    
+
     return result;
   } catch (error) {
     console.error('Parse error:', error);
     return {
       error: '解析エラー',
       rawContent: content,
-      slipDate: new Date().toISOString().split('T')[0], // エラー時も日付を設定
-      slipType: slipType
+      slipDate: new Date().toISOString().split('T')[0],
+      slipType: slipType,
     };
   }
 }
 
-// 値の抽出ヘルパー
-function extractValue(text, key) {
+function extractValue(text: string, key: string): string {
   const regex = new RegExp(`${key}[：:：\\s]*([^\\n]+)`, 'i');
   const match = text.match(regex);
   return match ? match[1].trim() : '';
 }
 
-module.exports = router;
+// Vercel / Next.js App Router: body size limit for this route
+export const maxDuration = 60; // OCR処理のタイムアウト（秒）
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = authenticateRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: '認証が必要です' },
+        { status: 401 }
+      );
+    }
+
+    const { image, slipType, usePreprocessing = true } = await request.json();
+
+    if (!image || !slipType) {
+      return NextResponse.json(
+        { success: false, error: '画像とタイプが必要です' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`OCR処理開始: ${slipType} (部分的成功許可版)`);
+
+    // 画像前処理
+    const processedImage = usePreprocessing ? await preprocessImage(image) : image;
+
+    // プロンプトの準備
+    const prompt = getPromptForSlipType(slipType);
+
+    // OpenAI Vision APIを呼び出し
+    const response = await getOpenAI().chat.completions.create({
+      model: 'gpt-5',
+      messages: [
+        {
+          role: 'system',
+          content: 'あなたは日本語の産業廃棄物伝票を正確に読み取るOCRアシスタントです。特に正味重量の数値は最重要項目として確実に読み取ってください。手書き文字も含めて注意深く読み取り、読み取れなかった項目はnullまたは空文字として返してください。',
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: processedImage,
+                detail: 'high',
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 1000,
+      temperature: 0.1,
+    });
+
+    // レスポンスの解析
+    const result = parseOCRResponse(response.choices[0].message.content || '', slipType);
+
+    console.log('OCR処理完了:', {
+      hasNetWeight: !!result.netWeight,
+      hasClientName: !!result.clientName,
+      hasDate: !!result.slipDate,
+      hasProduct: !!result.productName,
+    });
+
+    const netWeightValid = result.netWeight && !isNaN(parseFloat(result.netWeight));
+
+    return NextResponse.json({
+      success: true,
+      data: result,
+      readQuality: {
+        netWeight: netWeightValid ? 'good' : 'missing',
+        clientName: result.clientName ? 'good' : 'missing',
+        slipDate: result.slipDate ? 'good' : 'default',
+        productName: result.productName ? 'good' : 'missing',
+      },
+      confidence: {
+        netWeight: netWeightValid ? 100 : 0,
+        clientName: result.clientName ? 80 : 0,
+        slipDate: result.slipDate && result.slipDate !== new Date().toISOString().split('T')[0] ? 80 : 50,
+        productName: result.productName ? 80 : 0,
+      },
+    });
+  } catch (error: any) {
+    console.error('OCR error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'OCR処理中にエラーが発生しました' },
+      { status: 500 }
+    );
+  }
+}

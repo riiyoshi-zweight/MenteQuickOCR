@@ -81,7 +81,7 @@ export default function PreviewPage() {
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/me`, {
+      const response = await fetch(`/api/auth/me`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -105,7 +105,7 @@ export default function PreviewPage() {
       const slipType = localStorage.getItem('selectedSlipType') || '受領証'
       
       // slip_typeをクエリパラメータとして追加
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
+      const response = await fetch(`/api/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -131,7 +131,7 @@ export default function PreviewPage() {
   const fetchWasteTypes = async (ocrData: any) => {
     try {
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips/waste-types`, {
+      const response = await fetch(`/api/slips/waste-types`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -544,7 +544,7 @@ export default function PreviewPage() {
       console.log('登録処理開始:', formData)
       
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/slips`, {
+      const response = await fetch(`/api/slips`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",
