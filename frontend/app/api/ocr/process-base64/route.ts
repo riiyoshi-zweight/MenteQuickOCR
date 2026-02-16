@@ -328,13 +328,7 @@ function extractValue(text: string, key: string): string {
 export const maxDuration = 60; // OCR処理のタイムアウト（秒）
 
 // base64画像のアップロード上限を引き上げ（デフォルト1MB→10MB）
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+export const maxRequestBodySize = '10mb';
 
 export async function POST(request: NextRequest) {
   try {
