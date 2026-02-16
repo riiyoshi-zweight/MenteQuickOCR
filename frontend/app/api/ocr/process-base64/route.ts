@@ -377,7 +377,6 @@ export async function POST(request: NextRequest) {
         },
       ],
       max_completion_tokens: 1000,
-      temperature: 0.1,
     });
 
     // レスポンスの解析
