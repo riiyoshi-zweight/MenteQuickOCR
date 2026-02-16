@@ -380,7 +380,9 @@ export async function POST(request: NextRequest) {
     });
 
     // レスポンスの解析
-    const result = parseOCRResponse(response.choices[0].message.content || '', slipType);
+    const rawContent = response.choices[0].message.content || '';
+    console.log('GPT-5 raw response:', rawContent);
+    const result = parseOCRResponse(rawContent, slipType);
 
     console.log('OCR処理完了:', {
       hasNetWeight: !!result.netWeight,
