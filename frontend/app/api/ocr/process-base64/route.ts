@@ -327,9 +327,6 @@ function extractValue(text: string, key: string): string {
 // Vercel / Next.js App Router: body size limit for this route
 export const maxDuration = 60; // OCR処理のタイムアウト（秒）
 
-// base64画像のアップロード上限を引き上げ（デフォルト1MB→10MB）
-export const maxRequestBodySize = '10mb';
-
 export async function POST(request: NextRequest) {
   try {
     const user = authenticateRequest(request);
