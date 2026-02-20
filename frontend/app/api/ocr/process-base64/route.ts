@@ -376,7 +376,8 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
-      max_completion_tokens: 1000,
+      max_completion_tokens: 16384,
+      reasoning_effort: 'low',
     });
 
     // レスポンスの解析
