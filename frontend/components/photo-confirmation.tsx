@@ -17,6 +17,7 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState("")
   const [ocrPreview, setOcrPreview] = useState<any>(null)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const router = useRouter()
 
   const updateProgress = (value: number, message: string) => {
@@ -49,7 +50,10 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
       
       // Process OCR
       const ocrResult = await ocrAPI.processImage(imageData, slipType)
-      
+
+      // デバッグ: APIレスポンス全体を表示
+      setDebugInfo(JSON.stringify(ocrResult, null, 2))
+
       updateProgress(0.7, '結果を処理しています...')
       await new Promise(resolve => setTimeout(resolve, 300))
       
@@ -82,23 +86,26 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
       localStorage.setItem('ocrResult', JSON.stringify(finalResult))
       
       updateProgress(1.0, '完了しました！')
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // Navigate to preview
-      router.push("/preview")
+
+      // デバッグ: 自動遷移を停止し、手動で進めるようにする
+      // router.push("/preview") は下のデバッグパネルのボタンから実行
     } catch (error) {
       console.error('OCR processing failed:', error)
       setOcrPreview(null)
       setProgress(0)
       setStatusMessage('')
-      
+
+      // デバッグ: エラー内容を表示
+      const errorDetail = error instanceof Error ? error.message : String(error)
+      setDebugInfo(`ERROR: ${errorDetail}`)
+
       // より詳細なエラーメッセージを表示
       let errorMessage = 'OCR処理に失敗しました。'
       if (error instanceof Error) {
         errorMessage += ' ' + error.message
       }
       errorMessage += ' もう一度お試しください。'
-      
+
       toast.error(errorMessage)
       // Don't navigate back, just reset the processing state
       setIsProcessing(false)
@@ -245,6 +252,30 @@ export default function PhotoConfirmation({ imageData, companyName, onRetake }: 
           </div>
         )}
       </div>
+
+      {/* デバッグパネル */}
+      {debugInfo && (
+        <div className="flex-shrink-0 bg-black text-green-400 p-3 max-h-[40vh] overflow-auto">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-yellow-400">DEBUG: OCR Response</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push("/preview")}
+                className="text-xs bg-blue-600 text-white px-3 py-1 rounded"
+              >
+                プレビューへ進む →
+              </button>
+              <button
+                onClick={() => setDebugInfo(null)}
+                className="text-xs bg-gray-600 text-white px-2 py-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <pre className="text-[10px] whitespace-pre-wrap break-all leading-tight">{debugInfo}</pre>
+        </div>
+      )}
     </div>
   )
 }
