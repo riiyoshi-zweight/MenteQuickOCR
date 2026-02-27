@@ -6,8 +6,6 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, password } = await request.json();
 
-    console.log('Login attempt for:', userId);
-
     // workersテーブルからユーザー情報を取得
     const { data: worker, error } = await supabase
       .from('workers')
@@ -16,7 +14,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error || !worker) {
-      console.log('Worker not found:', error);
       return NextResponse.json(
         { success: false, error: 'ユーザーIDまたはパスワードが正しくありません' },
         { status: 401 }
@@ -27,7 +24,6 @@ export async function POST(request: NextRequest) {
     const hashedPassword = hashPassword(password, userId);
 
     if (worker.password_hash !== hashedPassword) {
-      console.log('Password mismatch');
       return NextResponse.json(
         { success: false, error: 'ユーザーIDまたはパスワードが正しくありません' },
         { status: 401 }
@@ -36,8 +32,6 @@ export async function POST(request: NextRequest) {
 
     // トークン生成
     const token = generateToken(worker);
-
-    console.log('Login successful for:', worker.name);
 
     return NextResponse.json({
       success: true,

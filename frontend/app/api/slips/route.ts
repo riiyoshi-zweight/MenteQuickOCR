@@ -18,8 +18,6 @@ export async function POST(request: NextRequest) {
       workerName: user.name,
     };
 
-    console.log('伝票登録開始:', slipData.slipType);
-
     // 重複チェック
     const { data: duplicates } = await supabase
       .from('slips')
@@ -66,8 +64,6 @@ export async function POST(request: NextRequest) {
       console.error('Insert error:', error);
       throw error;
     }
-
-    console.log('伝票登録完了:', data);
 
     return NextResponse.json({
       success: true,

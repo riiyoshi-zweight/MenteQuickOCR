@@ -15,9 +15,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const slipType = searchParams.get('slipType');
 
-    console.log('=== 得意先取得 ===');
-    console.log('リクエストされた slipType:', slipType);
-
     let query = supabase
       .from('client_master')
       .select('*')
@@ -36,8 +33,6 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log(`取得件数: ${data ? data.length : 0}件`);
 
     const mappedData = (data || []).map((client: any) => ({
       id: client.id,

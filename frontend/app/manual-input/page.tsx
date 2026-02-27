@@ -5,13 +5,23 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 
+// 処理会社名 → DB上のslip_typeへのマッピング
+const COMPANIES = [
+  { name: "アース富山", slipType: "計量票" },
+  { name: "アース長野", slipType: "計量伝票" },
+  { name: "Jマテバイオ", slipType: "検量書" },
+  { name: "環境開発", slipType: "受領証" },
+] as const
+
 export default function ManualInputPage() {
   const router = useRouter()
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [wasteTypes, setWasteTypes] = useState<any[]>([])
   const [workerName, setWorkerName] = useState<string>("") // 作業者名の状態を追加
+  const [selectedCompany, setSelectedCompany] = useState("") // 選択中の処理会社名
   const [formData, setFormData] = useState({
+    slipType: "",
     date: new Date().toISOString().split('T')[0], // 現在の日付をデフォルトに
     customerName: "",
     netWeight: "",
@@ -19,17 +29,28 @@ export default function ManualInputPage() {
     manifestNumber: "",
   })
 
-  // Supabaseから得意先と品目を取得
+  // ユーザー情報と品目を取得
   useEffect(() => {
     fetchUserInfo()
-    fetchClients()
     fetchWasteTypes()
   }, [])
 
-  const fetchClients = async () => {
+  // 処理会社が変更されたら得意先を再取得し、選択をリセット
+  useEffect(() => {
+    const company = COMPANIES.find(c => c.name === selectedCompany)
+    if (company) {
+      setFormData(prev => ({ ...prev, slipType: company.slipType, customerName: "" }))
+      fetchClients(company.slipType)
+    } else {
+      setFormData(prev => ({ ...prev, slipType: "", customerName: "" }))
+      setClients([])
+    }
+  }, [selectedCompany])
+
+  const fetchClients = async (slipType: string) => {
     try {
       const token = localStorage.getItem("authToken")
-      const response = await fetch(`/api/slips/clients`, {
+      const response = await fetch(`/api/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -80,7 +101,6 @@ export default function ManualInputPage() {
         const data = await response.json()
         if (data.success && data.data) {
           setWorkerName(data.data.name || data.data.userId || "")
-          console.log('作業者名を設定:', data.data.name || data.data.userId)
         }
       }
     } catch (error) {
@@ -102,8 +122,6 @@ export default function ManualInputPage() {
 
   const handleConfirmSave = async () => {
     try {
-      console.log('登録処理開始:', formData)
-      
       const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips`, {
         method: 'POST',
@@ -118,14 +136,13 @@ export default function ManualInputPage() {
           productName: formData.item,
           itemName: formData.item,
           manifestNumber: formData.manifestNumber || null,
-          slipType: '手動入力',
+          slipType: formData.slipType,
           isManualInput: true
         })
       })
       
       const data = await response.json()
-      console.log('登録レスポンス:', data)
-      
+
       if (response.ok && data.success) {
         setShowConfirmation(false)
         toast.success('登録が完了しました')
@@ -178,6 +195,27 @@ export default function ManualInputPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
+              伝票タイプ <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg bg-white appearance-none pr-12"
+              >
+                <option value="">選択してください</option>
+                {COMPANIES.map((company) => (
+                  <option key={company.name} value={company.name}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               伝票日付 <span className="text-red-500">*</span>
             </label>
             <input
@@ -202,9 +240,10 @@ export default function ManualInputPage() {
               <select
                 value={formData.customerName}
                 onChange={(e) => handleInputChange("customerName", e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg bg-white appearance-none pr-12"
+                disabled={!selectedCompany}
+                className={`w-full p-3 border border-gray-300 rounded-lg appearance-none pr-12 ${!selectedCompany ? 'bg-gray-100 text-gray-400' : 'bg-white'}`}
               >
-                <option value="">選択してください</option>
+                <option value="">{selectedCompany ? '選択してください' : '先に伝票タイプを選択してください'}</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.name}>
                     {client.name}
@@ -276,6 +315,10 @@ export default function ManualInputPage() {
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
             <h2 className="text-lg font-semibold mb-4 text-center">入力内容の確認</h2>
             <div className="space-y-3 mb-6">
+              <div className="flex justify-between">
+                <span className="text-gray-600">伝票タイプ:</span>
+                <span>{selectedCompany || "未選択"}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">伝票日付:</span>
                 <span>{formData.date}</span>

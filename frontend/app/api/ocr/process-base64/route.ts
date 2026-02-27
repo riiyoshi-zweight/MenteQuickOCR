@@ -16,7 +16,6 @@ async function preprocessImage(base64Image: string): Promise<string> {
   try {
     const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const metadata = await sharp(buffer).metadata();
-    console.log(`Original image: ${metadata.width}x${metadata.height}, format: ${metadata.format}`);
 
     let processedBuffer: Buffer;
 
@@ -38,9 +37,6 @@ async function preprocessImage(base64Image: string): Promise<string> {
         .jpeg({ quality: 95, mozjpeg: true })
         .toBuffer();
     }
-
-    const processedMetadata = await sharp(processedBuffer).metadata();
-    console.log(`Processed image: ${processedMetadata.width}x${processedMetadata.height}`);
 
     return `data:image/jpeg;base64,${processedBuffer.toString('base64')}`;
   } catch (error) {
@@ -346,8 +342,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`OCR処理開始: ${slipType} (部分的成功許可版)`);
-
     // 画像前処理
     const processedImage = usePreprocessing ? await preprocessImage(image) : image;
 
@@ -382,15 +376,7 @@ export async function POST(request: NextRequest) {
 
     // レスポンスの解析
     const rawContent = response.choices[0].message.content || '';
-    console.log('GPT-5 raw response:', rawContent);
     const result = parseOCRResponse(rawContent, slipType);
-
-    console.log('OCR処理完了:', {
-      hasNetWeight: !!result.netWeight,
-      hasClientName: !!result.clientName,
-      hasDate: !!result.slipDate,
-      hasProduct: !!result.productName,
-    });
 
     const netWeightValid = result.netWeight && !isNaN(parseFloat(result.netWeight));
 

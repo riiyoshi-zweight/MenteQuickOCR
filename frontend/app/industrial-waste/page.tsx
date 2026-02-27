@@ -33,7 +33,6 @@ export default function IndustrialWastePage() {
   }
 
   const handleImageCapture = (imageData: string) => {
-    console.log("Image captured for", selectedCompany)
     setShowCamera(false)
     setSelectedCompany("")
   }

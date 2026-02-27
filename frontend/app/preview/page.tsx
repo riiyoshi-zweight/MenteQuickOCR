@@ -46,8 +46,7 @@ export default function PreviewPage() {
     if (ocrResultStr) {
       try {
         const ocrData = JSON.parse(ocrResultStr)
-        console.log('OCR結果を読み込み:', ocrData)
-        
+
         // OCR結果をフォームに反映
         setFormData((prev) => ({
           ...prev,
@@ -91,7 +90,6 @@ export default function PreviewPage() {
         const data = await response.json()
         if (data.success && data.data) {
           setWorkerName(data.data.name || data.data.userId || "テストユーザー")
-          console.log('作業者名を設定:', data.data.name || data.data.userId)
         }
       }
     } catch (error) {
@@ -115,8 +113,7 @@ export default function PreviewPage() {
         const data = await response.json()
         if (data.success) {
           setClients(data.data)
-          console.log(`伝票タイプ「${slipType}」用の得意先を${data.data.length}件取得しました`)
-          
+
           // OCR結果と得意先をマッチング（OCRデータを直接渡す）
           if (ocrData && ocrData.clientName) {
             matchClientFromOCR(data.data, ocrData.clientName, ocrData.slipType)
@@ -158,12 +155,6 @@ export default function PreviewPage() {
     if (ocrClientName && clientList.length > 0) {
       const ocrClientNameLower = ocrClientName.toLowerCase()
       
-      console.log('得意先マッチング開始:', {
-        ocrResult: ocrClientName,
-        slipType,
-        clientCount: clientList.length
-      })
-      
       // 伝票タイプ別の特別ルール
       // 計量票の特別ルール
       if (slipType === '計量票') {
@@ -178,7 +169,7 @@ export default function PreviewPage() {
               customerName: matched.name,
               slipType: slipType // localStorageから取得した値を維持
             }))
-            console.log(`得意先「${matched.name}」に自動マッチング（計量票特別ルール）`)
+
             return
           }
         }
@@ -194,7 +185,7 @@ export default function PreviewPage() {
               customerName: matched.name,
               slipType: slipType // localStorageから取得した値を維持
             }))
-            console.log(`得意先「${matched.name}」に自動マッチング（下水道センター変換）`)
+
             return
           }
         }
@@ -220,7 +211,7 @@ export default function PreviewPage() {
                 customerName: matched.name,
                 slipType: slipType // localStorageから取得した値を維持
               }))
-              console.log(`得意先「${matched.name}」に自動マッチング（検量書便名変換）`)
+
               return
             }
           }
@@ -240,7 +231,7 @@ export default function PreviewPage() {
               customerName: matched.name,
               slipType: slipType // localStorageから取得した値を維持
             }))
-            console.log(`得意先「${matched.name}」に自動マッチング（ブルボン上越）`)
+
             return
           }
         } else if (ocrClientNameLower.includes('柏崎')) {
@@ -253,7 +244,7 @@ export default function PreviewPage() {
               customerName: matched.name,
               slipType: slipType // localStorageから取得した値を維持
             }))
-            console.log(`得意先「${matched.name}」に自動マッチング（ブルボン柏崎）`)
+
             return
           }
         }
@@ -303,7 +294,6 @@ export default function PreviewPage() {
               client.name.toLowerCase().includes(keywordLower)
             )
             if (matched) {
-              console.log(`キーワード「${keyword}」でマッチング成功`)
               break
             }
           }
@@ -348,10 +338,9 @@ export default function PreviewPage() {
         
         if (bestMatch) {
           matched = bestMatch
-          console.log(`類似度マッチング: ${bestMatch.name} (スコア: ${bestScore.toFixed(2)})`)
         }
       }
-      
+
       // マッチした場合は選択
       if (matched) {
         setFormData((prev) => ({
@@ -359,10 +348,6 @@ export default function PreviewPage() {
           customerName: matched.name,
           slipType: slipType // localStorageから取得した値を維持
         }))
-        console.log(`得意先「${matched.name}」に自動マッチング`)
-      } else {
-        console.log('得意先の自動マッチング失敗:', ocrClientName)
-        console.log('利用可能な得意先:', clientList.map(c => c.name))
       }
     }
   }
@@ -371,12 +356,6 @@ export default function PreviewPage() {
   const matchWasteTypeFromOCR = (wasteTypeList: any[], ocrProductName: string, slipType: string) => {
     if (ocrProductName && wasteTypeList.length > 0) {
       const ocrItem = ocrProductName.toLowerCase()
-      
-      console.log('品目マッチング開始:', {
-        ocrResult: ocrProductName,
-        slipType,
-        wasteTypeCount: wasteTypeList.length
-      })
       
       // 検量書（Jマテバイオ）の特別ルール
       if (slipType === '検量書' && ocrProductName.toLowerCase().includes('産廃生ゴミ')) {
@@ -388,7 +367,6 @@ export default function PreviewPage() {
             ...prev,
             item: matched.name
           }))
-          console.log('品目「残さ」に自動マッチング（検量書の産廃生ゴミ特別ルール）')
           return
         }
       }
@@ -450,7 +428,6 @@ export default function PreviewPage() {
                 ...prev,
                 item: matched.name
               }))
-              console.log(`品目「${matched.name}」に自動マッチング（${pattern}ルール）`)
               return
             }
           }
@@ -505,20 +482,15 @@ export default function PreviewPage() {
         
         if (bestMatch) {
           matched = bestMatch
-          console.log(`類似度マッチング: ${bestMatch.name} (スコア: ${bestScore.toFixed(2)})`)
         }
       }
-      
+
       // マッチした場合は選択
       if (matched) {
         setFormData((prev) => ({
           ...prev,
           item: matched.name
         }))
-        console.log(`品目「${matched.name}」に自動マッチング`)
-      } else {
-        console.log('品目の自動マッチング失敗:', ocrProductName)
-        console.log('利用可能な品目:', wasteTypeList.slice(0, 10).map(w => w.name))
       }
     }
   }
@@ -541,8 +513,6 @@ export default function PreviewPage() {
 
   const handleConfirmSave = async () => {
     try {
-      console.log('登録処理開始:', formData)
-      
       const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips`, {
         method: 'POST',
@@ -563,8 +533,7 @@ export default function PreviewPage() {
       })
       
       const data = await response.json()
-      console.log('登録レスポンス:', data)
-      
+
       if (response.ok && data.success) {
         setShowConfirmation(false)
         toast.success('登録が完了しました')
