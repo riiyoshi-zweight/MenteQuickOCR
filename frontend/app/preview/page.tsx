@@ -79,11 +79,8 @@ export default function PreviewPage() {
   // ログインユーザー情報を取得
   const fetchUserInfo = async () => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/auth/me`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -99,14 +96,11 @@ export default function PreviewPage() {
 
   const fetchClients = async (ocrData: any) => {
     try {
-      const token = localStorage.getItem("authToken")
       const slipType = localStorage.getItem('selectedSlipType') || '受領証'
-      
+
       // slip_typeをクエリパラメータとして追加
       const response = await fetch(`/api/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -127,11 +121,8 @@ export default function PreviewPage() {
 
   const fetchWasteTypes = async (ocrData: any) => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips/waste-types`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -513,13 +504,12 @@ export default function PreviewPage() {
 
   const handleConfirmSave = async () => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           slipDate: formData.date,
           clientName: formData.customerName,

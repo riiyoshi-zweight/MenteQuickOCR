@@ -49,11 +49,8 @@ export default function ManualInputPage() {
 
   const fetchClients = async (slipType: string) => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips/clients?slipType=${encodeURIComponent(slipType)}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -69,11 +66,8 @@ export default function ManualInputPage() {
 
   const fetchWasteTypes = async () => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips/waste-types`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -90,11 +84,8 @@ export default function ManualInputPage() {
   // ログインユーザー情報を取得
   const fetchUserInfo = async () => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/auth/me`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
       
       if (response.ok) {
@@ -112,7 +103,8 @@ export default function ManualInputPage() {
     router.push("/industrial-waste")
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
     router.push("/")
   }
 
@@ -122,13 +114,12 @@ export default function ManualInputPage() {
 
   const handleConfirmSave = async () => {
     try {
-      const token = localStorage.getItem("authToken")
       const response = await fetch(`/api/slips`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           slipDate: formData.date,
           clientName: formData.customerName,

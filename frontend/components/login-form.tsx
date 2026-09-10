@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,12 +35,13 @@ export function LoginForm() {
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
-          localStorage.setItem("authToken", data.data.token)
           localStorage.setItem("userName", data.data.user.name)
           if (rememberMe) {
             localStorage.setItem("savedUsername", username)
+          } else {
+            localStorage.removeItem("savedUsername")
           }
-          router.push("/dashboard")
+          router.push("/menu")
           return
         } else {
           // APIからのエラーメッセージを使用
@@ -171,6 +173,12 @@ export function LoginForm() {
           >
             ログイン
           </Button>
+
+          <div className="text-center">
+            <Link href="/forgot-password" className="text-sm text-sky-500 hover:underline">
+              パスワードを忘れた場合
+            </Link>
+          </div>
         </form>
       </CardContent>
     </Card>

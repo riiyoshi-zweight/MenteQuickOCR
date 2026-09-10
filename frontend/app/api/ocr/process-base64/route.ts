@@ -325,7 +325,7 @@ export const maxDuration = 60; // OCR処理のタイムアウト（秒）
 
 export async function POST(request: NextRequest) {
   try {
-    const user = authenticateRequest(request);
+    const user = await authenticateRequest(request);
     if (!user) {
       return NextResponse.json(
         { success: false, error: '認証が必要です' },

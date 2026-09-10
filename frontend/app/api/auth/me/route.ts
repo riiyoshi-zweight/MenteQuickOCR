@@ -3,7 +3,7 @@ import { authenticateRequest } from '@/lib/server/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = authenticateRequest(request);
+    const user = await authenticateRequest(request);
 
     if (!user) {
       return NextResponse.json(

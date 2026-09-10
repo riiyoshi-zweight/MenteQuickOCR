@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { LogOut } from "lucide-react"
+import { LogOut, ArrowLeft } from "lucide-react"
 
 export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -27,7 +27,15 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="shadow-sm border-b" style={{ backgroundColor: "#38b6ff" }}>
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex-1" />
+          <div className="flex-1 flex justify-start">
+            <button
+              onClick={() => router.push("/menu")}
+              className="p-2 text-white hover:text-gray-200 hover:bg-white/10 rounded-lg transition-colors"
+              aria-label="戻る"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          </div>
           {/* Increased font size from text-lg to text-xl */}
           <h1 className="text-xl font-semibold text-white">Quick OCR</h1>
           <div className="flex-1 flex justify-end">

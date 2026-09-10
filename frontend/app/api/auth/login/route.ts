@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/server/supabase';
-import { hashPassword, generateToken } from '@/lib/server/auth';
+import {
+  hashPassword,
+  verifyPassword,
+  isBcryptHash,
+  generateToken,
+  AUTH_COOKIE_NAME,
+  AUTH_COOKIE_MAX_AGE,
+} from '@/lib/server/auth';
+import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/server/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+
   try {
     const { userId, password } = await request.json();
 
-    // workersテーブルからユーザー情報を取得
+    const rateLimitResult = checkRateLimit(ip, userId);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { success: false, error: `試行回数が上限を超えました。${rateLimitResult.retryAfterSeconds}秒後に再試行してください` },
+        { status: 429, headers: { 'Retry-After': String(rateLimitResult.retryAfterSeconds) } }
+      );
+    }
+
     const { data: worker, error } = await supabase
       .from('workers')
       .select('*')
@@ -14,29 +31,38 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error || !worker) {
+      recordFailedAttempt(ip, userId);
       return NextResponse.json(
         { success: false, error: 'ユーザーIDまたはパスワードが正しくありません' },
         { status: 401 }
       );
     }
 
-    // パスワード検証
-    const hashedPassword = hashPassword(password, userId);
-
-    if (worker.password_hash !== hashedPassword) {
+    const valid = await verifyPassword(password, worker.password_hash, userId);
+    if (!valid) {
+      recordFailedAttempt(ip, userId);
       return NextResponse.json(
         { success: false, error: 'ユーザーIDまたはパスワードが正しくありません' },
         { status: 401 }
       );
     }
 
-    // トークン生成
+    resetAttempts(ip, userId);
+
+    if (!isBcryptHash(worker.password_hash)) {
+      const bcryptHash = await hashPassword(password);
+      await supabase
+        .from('workers')
+        .update({ password_hash: bcryptHash })
+        .eq('id', worker.id);
+    }
+
     const token = generateToken(worker);
 
-    return NextResponse.json({
+    const isProduction = process.env.NODE_ENV === 'production';
+    const response = NextResponse.json({
       success: true,
       data: {
-        token,
         user: {
           id: worker.id,
           employeeId: worker.user_id,
@@ -45,6 +71,16 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    response.cookies.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: AUTH_COOKIE_MAX_AGE,
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
