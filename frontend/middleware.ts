@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const PUBLIC_PATHS = new Set(['/', '/forgot-password', '/reset-password']);
+const HIDDEN_PATHS = new Set(['/menu', '/dashboard', '/septic-inspection']);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -28,6 +29,10 @@ export function middleware(request: NextRequest) {
   const sessionToken = request.cookies.get('session_token')?.value;
   if (!sessionToken) {
     return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (HIDDEN_PATHS.has(pathname)) {
+    return NextResponse.redirect(new URL('/industrial-waste', request.url));
   }
 
   return NextResponse.next();

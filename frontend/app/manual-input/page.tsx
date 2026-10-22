@@ -137,7 +137,7 @@ export default function ManualInputPage() {
       if (response.ok && data.success) {
         setShowConfirmation(false)
         toast.success('登録が完了しました')
-        router.push("/dashboard")
+        router.push("/industrial-waste")
       } else {
         toast.error(data.error || '登録に失敗しました')
       }

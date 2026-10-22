@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, LogOut } from "lucide-react"
+import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Image from "next/image"
@@ -10,10 +10,6 @@ export default function IndustrialWastePage() {
   const router = useRouter()
   const [showCamera, setShowCamera] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState<string>("")
-
-  const handleBack = () => {
-    router.push("/dashboard")
-  }
 
   const handleLogout = () => {
     router.push("/")
@@ -79,9 +75,7 @@ export default function IndustrialWastePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#38b6ff] text-white p-4 flex items-center justify-between">
-        <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
+        <div className="w-10" aria-hidden="true" />
 
         <h1 className="text-xl font-semibold">産廃</h1>
 

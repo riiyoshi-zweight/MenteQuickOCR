@@ -41,7 +41,7 @@ export function LoginForm() {
           } else {
             localStorage.removeItem("savedUsername")
           }
-          router.push("/menu")
+          router.push("/industrial-waste")
           return
         } else {
           // APIからのエラーメッセージを使用
